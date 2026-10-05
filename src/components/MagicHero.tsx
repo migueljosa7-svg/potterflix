@@ -5,55 +5,35 @@ import type { LoadState, MediaItem } from '../types/tmdb'
 import { HOUSES } from '../services/tmdb'
 
 interface MagicHeroProps {
-  /** Titulos destacados (GET /trending/all/week). */
   items: MediaItem[]
   state: LoadState
-  /** Abre el modal reproductor (Ver Ahora / Más información). */
   onSelect: (item: MediaItem) => void
-  /** Si el titulo destacado esta en Mi Lista (se evalua por titulo rotado). */
   isSaved: (item: MediaItem) => boolean
   onToggleSave: (item: MediaItem) => void
 }
 
-/** Formatea los minutos como "2h 14min"; '' si la pieza no reporta duracion. */
 const formatDuration = (minutes: number): string =>
   minutes > 0 ? Math.floor(minutes / 60) + 'h ' + (minutes % 60) + 'min' : ''
 
-/** Cantidad de titulos que rotan en el banner. */
 const SPOTLIGHT_LIMIT = 5
-/** Milisegundos que dura cada destacado antes de rotar. */
 const ROTATION_MS = 9000
 
 /**
- * MagicHero - Banner cinematico del Pensadero con los destacados de la semana
- * de TMDB. Rota automaticamente entre los primeros titulos (salvo que el
- * usuario prefiera movimiento reducido) y abre el modal reproductor con el
- * trailer oficial.
+ * MagicHero V4.0 — Banner cinematográfico "El Pensadero".
  *
- * RENDIMIENTO: las brasas se generan una vez por titulo con `useMemo` y son
- * CSS puro (`animate-ember`), de modo que no hay repintados por frame. La
- * rotacion es un `setInterval` de estado: solo re-renderiza este componente,
- * nunca las filas ni las tarjetas.
+ * Rota automáticamente entre los primeros 5 títulos trending de TMDB.
+ * Incluye botón "Ver Tráiler" prominente y metadatos con valoración en Galeones.
  */
-function MagicHero({
-  items,
-  state,
-  onSelect,
-  isSaved,
-  onToggleSave,
-}: MagicHeroProps) {
+function MagicHero({ items, state, onSelect, isSaved, onToggleSave }: MagicHeroProps) {
   const [index, setIndex] = useState(0)
 
-  /** Solo los titulos con fondo panoramico sirven para el banner. */
   const spotlights = useMemo(
     () => items.filter((item) => item.backdrop).slice(0, SPOTLIGHT_LIMIT),
     [items],
   )
 
-  // Si cambia el catalogo, se vuelve al primer destacado.
   useEffect(() => setIndex(0), [spotlights])
 
-  // Rotacion automatica, desactivada con preferencia de movimiento reducido.
   useEffect(() => {
     if (spotlights.length < 2) return
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
@@ -67,28 +47,27 @@ function MagicHero({
   const current = spotlights[Math.min(index, spotlights.length - 1)] ?? null
   const accent =
     HOUSES.find((house) => house.id === (current?.house ?? 'gryffindor'))?.accent ?? '#ffd75e'
-  /** Estado del destacado visible respecto a Mi Lista. */
+  const houseData = HOUSES.find((h) => h.id === (current?.house ?? 'gryffindor')) ?? HOUSES[0]
   const saved = current ? isSaved(current) : false
 
-  // Brasas flotantes: se recalculan solo cuando cambia el titulo en pantalla.
+  // Brasas flotantes generadas una sola vez por título
   const embers = useMemo(
     () =>
-      Array.from({ length: 20 }, (_, i) => ({
+      Array.from({ length: 24 }, (_, i) => ({
         id: i,
         left: Math.random() * 100,
         delay: Math.random() * 7,
         duration: 6 + Math.random() * 6,
         size: 1.5 + Math.random() * 3.5,
-        drift: (Math.random() - 0.5) * 160,
+        drift: (Math.random() - 0.5) * 180,
         gold: Math.random() > 0.3,
       })),
     [current?.id],
   )
 
-  /* ---------- Estado de carga / vacio: esqueleto que conserva la altura ---------- */
   if (!current) {
     return (
-      <section className="relative flex h-[88vh] min-h-[560px] w-full items-center justify-center overflow-hidden bg-gradient-to-br from-[#141623] via-night to-[#0b0c14]">
+      <section className="relative flex h-[90vh] min-h-[600px] w-full items-center justify-center overflow-hidden bg-gradient-to-br from-[#141623] via-night to-[#0b0c14]">
         <div className="px-6 text-center">
           <p className="glow-effect font-display text-2xl font-bold sm:text-4xl">
             {state === 'loading' ? 'Encendiendo el Pensadero…' : 'El Pensadero está vacío'}
@@ -100,8 +79,8 @@ function MagicHero({
           )}
           <p className="mt-4 max-w-md text-sm text-vellum/80">
             {state === 'loading'
-              ? 'Invocando los titulos en tendencia de TMDB.'
-              : 'No hay destacados disponibles ahora mismo. Prueba con la busqueda magica.'}
+              ? 'Invocando los títulos en tendencia de TMDB.'
+              : 'No hay destacados disponibles ahora mismo. Prueba con la búsqueda mágica.'}
           </p>
         </div>
       </section>
@@ -111,13 +90,13 @@ function MagicHero({
   const duration = formatDuration(current.durationMinutes)
 
   return (
-    <section className="relative h-[88vh] min-h-[560px] w-full overflow-hidden">
-      {/* Fondo cinematico: cross-fade entre destacados */}
+    <section className="relative h-[90vh] min-h-[600px] w-full overflow-hidden">
+      {/* Fondo cinématico: cross-fade entre destacados */}
       <motion.div
         key={current.id}
-        initial={{ opacity: 0, scale: 1.06 }}
+        initial={{ opacity: 0, scale: 1.07 }}
         animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
+        transition={{ duration: 1.4, ease: [0.22, 1, 0.36, 1] }}
         className="absolute inset-0"
       >
         <img
@@ -129,17 +108,18 @@ function MagicHero({
         />
       </motion.div>
 
-      {/* Velo de sombras: contraste garantizado para el texto claro */}
-      <div className="absolute inset-0 bg-gradient-to-r from-night via-night/85 to-night/30" />
-      <div className="absolute inset-0 bg-gradient-to-t from-night via-transparent to-night/60" />
+      {/* Capas de velo: contraste máximo garantizado */}
+      <div className="absolute inset-0 bg-gradient-to-r from-night via-night/88 to-night/20" />
+      <div className="absolute inset-0 bg-gradient-to-t from-night via-transparent to-night/55" />
+      {/* Aura de la casa */}
       <div
-        className="absolute inset-0 opacity-50"
+        className="absolute inset-0 opacity-45 transition-opacity duration-1000"
         style={{
-          background: 'radial-gradient(circle at 30% 40%, ' + accent + '55, transparent 60%)',
+          background: `radial-gradient(ellipse at 28% 45%, ${accent}50, transparent 62%)`,
         }}
       />
 
-      {/* Brasas y polvo magico (CSS puro, sin coste en JS) */}
+      {/* Brasas mágicas (CSS puro) */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
         {embers.map((ember) => (
           <span
@@ -153,104 +133,115 @@ function MagicHero({
                 animationDelay: ember.delay + 's',
                 animationDuration: ember.duration + 's',
                 '--drift': ember.drift + 'px',
-                background: ember.gold ? '#fff3c4' : '#a9c8ff',
+                background: ember.gold ? '#fff3c4' : accent + 'cc',
                 boxShadow:
                   '0 0 8px 2px ' +
-                  (ember.gold ? 'rgba(255,243,196,0.75)' : 'rgba(169,200,255,0.6)'),
+                  (ember.gold ? 'rgba(255,243,196,0.75)' : `${accent}88`),
               } as React.CSSProperties
             }
           />
         ))}
       </div>
 
-      {/* Contenido */}
-      <div className="relative z-10 mx-auto flex h-full max-w-[1600px] flex-col justify-end px-4 pb-24 sm:px-8 lg:px-12 lg:pb-32">
+      {/* Contenido principal */}
+      <div className="relative z-10 mx-auto flex h-full max-w-[1600px] flex-col justify-end px-4 pb-28 sm:px-8 lg:px-12 lg:pb-36">
         <motion.div
           key={current.id + '-content'}
-          initial={{ opacity: 0, y: 26 }}
+          initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ duration: 0.9, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
         >
-          {/* Distintivo de la casa / tipo de medio */}
-          <span
-            className="mb-4 inline-flex items-center gap-2 rounded-full border px-3 py-1 font-display text-[0.6rem] font-bold uppercase tracking-[0.28em]"
+          {/* Distintivo de la casa */}
+          <motion.span
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.6, delay: 0.25 }}
+            className="mb-4 inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 font-display text-[0.62rem] font-bold uppercase tracking-[0.3em]"
             style={{
-              borderColor: accent + '99',
+              borderColor: accent + '90',
               color: accent,
-              background: 'rgba(8,9,15,0.75)',
+              background: 'rgba(8,9,15,0.82)',
+              boxShadow: `0 0 20px ${accent}30`,
             }}
           >
-            <span className="h-1.5 w-1.5 rounded-full" style={{ background: accent }} />
-            Destacado del Pensadero · {current.mediaType === 'tv' ? 'Serie' : 'Película'}
-          </span>
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full" style={{ background: accent }} />
+            {houseData.sigil} {houseData.name} · {current.mediaType === 'tv' ? 'Serie' : 'Película'}
+          </motion.span>
 
-          <h1 className="glow-effect font-display text-4xl font-black leading-[1.05] sm:text-6xl lg:text-7xl">
+          {/* Título principal */}
+          <h1 className="glow-effect font-display text-4xl font-black leading-[1.04] sm:text-6xl lg:text-7xl xl:text-8xl">
             {current.title}
           </h1>
 
           {current.tagline && (
-            <p className="mt-3 font-display text-sm italic text-gold/90 sm:text-base">
-              {current.tagline}
+            <p className="mt-3 font-display text-sm italic text-gold/88 sm:text-base lg:text-lg">
+              "{current.tagline}"
             </p>
           )}
 
-          {/* Metadatos en vellum claro */}
-          <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-medium text-vellum">
-            <span className="flex items-center gap-1.5">
+          {/* Metadatos */}
+          <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm font-medium text-vellum">
+            <span className="flex items-center gap-2">
               <Star className="h-4 w-4 fill-gold text-gold" />
-              <span className="font-bold text-gold-light">{current.score.toFixed(1)}</span>
-              <span className="hidden sm:inline">Galeones de Oro</span>
+              <span className="text-base font-black text-gold-light">{current.score.toFixed(1)}</span>
+              <span className="hidden text-xs text-vellum/65 sm:inline">Galeones de Oro</span>
             </span>
-            {current.year > 0 && <span className="tabular-nums">{current.year}</span>}
-            {duration && <span className="tabular-nums">{duration}</span>}
+            {current.year > 0 && <span className="tabular-nums text-vellum/85">{current.year}</span>}
+            {duration && <span className="tabular-nums text-vellum/85">{duration}</span>}
             {current.genres.length > 0 && (
-              <span className="rounded border border-gold/45 px-1.5 py-0.5 font-semibold text-vellum">
+              <span
+                className="rounded border px-2 py-0.5 font-semibold text-xs text-vellum"
+                style={{ borderColor: accent + '55' }}
+              >
                 {current.genres.slice(0, 3).join(' · ')}
               </span>
             )}
           </div>
 
-          {/* Sinopsis en pergamino claro */}
-          <p className="mt-5 line-clamp-3 max-w-xl text-sm leading-relaxed text-vellum sm:text-base">
+          {/* Sinopsis */}
+          <p className="mt-5 line-clamp-3 max-w-xl text-sm leading-relaxed text-vellum/90 sm:text-base lg:max-w-2xl">
             {current.synopsis}
           </p>
-          {/* Botones magicos de alto contraste */}
+
+          {/* Botones de acción */}
           <div className="mt-8 flex flex-wrap items-center gap-3">
+            {/* Ver Tráiler — botón principal dorado */}
             <motion.button
               type="button"
               onClick={() => onSelect(current)}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.96 }}
-              className="group relative flex items-center gap-2.5 overflow-hidden rounded-md bg-gold px-7 py-3 font-display text-sm font-black uppercase tracking-wider text-night shadow-[0_0_30px_-6px_rgba(255,215,0,0.9)]"
+              whileHover={{ scale: 1.06 }}
+              whileTap={{ scale: 0.97 }}
+              className="group relative flex items-center gap-2.5 overflow-hidden rounded-lg bg-gold px-7 py-3.5 font-display text-sm font-black uppercase tracking-wider text-night shadow-[0_0_40px_-6px_rgba(255,215,0,0.95)]"
             >
-              {/* Barrido de luz del hechizo Lumos */}
-              <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/55 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
-              <Play className="h-4 w-4 fill-night" />
-              Ver Ahora
+              <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/50 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
+              <Play className="relative z-10 h-4 w-4 fill-night" />
+              <span className="relative z-10">Ver Tráiler</span>
             </motion.button>
 
+            {/* Más información */}
             <motion.button
               type="button"
               onClick={() => onSelect(current)}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.96 }}
-              className="flex items-center gap-2.5 rounded-md border-2 border-gold/80 bg-night/70 px-7 py-3 font-display text-sm font-bold uppercase tracking-wider text-white backdrop-blur-sm transition-colors hover:bg-gold hover:text-night"
+              whileHover={{ scale: 1.06 }}
+              whileTap={{ scale: 0.97 }}
+              className="flex items-center gap-2.5 rounded-lg border-2 border-gold/75 bg-night/72 px-7 py-3.5 font-display text-sm font-bold uppercase tracking-wider text-white backdrop-blur-sm transition-colors hover:bg-gold hover:text-night hover:border-gold"
             >
               <Info className="h-4 w-4" />
               Más Información
             </motion.button>
 
+            {/* Mi Lista */}
             <motion.button
               type="button"
               onClick={() => onToggleSave(current)}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.96 }}
+              whileHover={{ scale: 1.06 }}
+              whileTap={{ scale: 0.97 }}
               aria-pressed={saved}
               className={
-                'flex items-center gap-2.5 rounded-md border-2 px-5 py-3 font-display text-sm font-bold uppercase tracking-wider backdrop-blur-sm transition-colors ' +
+                'flex items-center gap-2.5 rounded-lg border-2 px-5 py-3.5 font-display text-sm font-bold uppercase tracking-wider backdrop-blur-sm transition-all duration-300 ' +
                 (saved
-                  ? 'border-gold bg-gold text-night'
-                  : 'border-gold/60 bg-night/70 text-gold-light hover:border-gold')
+                  ? 'border-gold bg-gold text-night shadow-[0_0_25px_rgba(255,215,0,0.5)]'
+                  : 'border-gold/55 bg-night/70 text-gold-light hover:border-gold')
               }
             >
               {saved ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
@@ -259,9 +250,9 @@ function MagicHero({
           </div>
         </motion.div>
 
-        {/* Puntos de rotacion entre destacados */}
+        {/* Puntos de rotación */}
         {spotlights.length > 1 && (
-          <div className="mt-6 flex items-center gap-2" aria-hidden="true">
+          <div className="mt-7 flex items-center gap-2" aria-hidden="true">
             {spotlights.map((spotlight, i) => (
               <button
                 key={spotlight.id}
@@ -270,8 +261,9 @@ function MagicHero({
                 aria-label={'Ver destacado ' + (i + 1)}
                 className={
                   'h-1 rounded-full transition-all duration-500 ' +
-                  (i === index ? 'w-8 bg-gold' : 'w-3 bg-vellum/35 hover:bg-vellum/60')
+                  (i === index ? 'w-10 opacity-100' : 'w-3 bg-vellum/30 hover:bg-vellum/55')
                 }
+                style={i === index ? { background: accent } : {}}
               />
             ))}
           </div>
@@ -279,10 +271,9 @@ function MagicHero({
       </div>
 
       {/* Desvanecido inferior hacia las filas */}
-      <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-night to-transparent" />
+      <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-night to-transparent" />
     </section>
   )
 }
 
 export default memo(MagicHero)
-

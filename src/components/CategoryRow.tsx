@@ -16,20 +16,18 @@ interface CategoryRowProps {
   onToggleSave: (item: MediaItem) => void
 }
 
-/** Ancho de cada tarjeta en px, usado para calcular el desplazamiento. */
-const CARD_WIDTH = 196
-/** Margen lateral del area desplazable. */
-const GAP = 14
+/**
+ * Ancho de cada tarjeta en px, sincronizado con MovieCard V4.0 (240px).
+ * El gap lateral es 16px.
+ */
+const CARD_WIDTH = 240
+const GAP = 16
 
 /**
- * CategoryRow - Fila horizontal de peliculas con scroll fluido, flechas
- * doradas en escritorio y soporte swipe en moviles.
+ * CategoryRow V4.0 — Carrusel horizontal con tarjetas grandes (240×360px).
  *
  * OPTIMIZACION: `syncArrows` se agrupa por fotograma con `requestAnimationFrame`.
- * Antes, cada evento `scroll` (que puede dispararse 60 veces por segundo)
- * llamaba a `setState` de forma directa, provocando renders innecesarios.
- * Ademas se usa IntersectionObserver en vez de animaciones de framer-motion por
- * fila, que registraban un observador por seccion.
+ * IntersectionObserver controla la entrada lazy de la seccion completa.
  */
 function CategoryRow({
   title,
@@ -64,7 +62,6 @@ function CategoryRow({
 
     let raf = 0
     const onScroll = () => {
-      // Se anota el trabajo y se ejecuta una sola vez por fotograma.
       if (raf) return
       raf = window.requestAnimationFrame(() => {
         raf = 0
@@ -114,19 +111,22 @@ function CategoryRow({
     <section
       ref={sectionRef}
       id={id}
-      className="group/row relative mb-14 scroll-mt-28 transition-opacity duration-700"
+      className="group/row relative mb-16 scroll-mt-28 transition-all duration-700"
       style={{
         opacity: visible ? 1 : 0,
-        transform: visible ? undefined : 'translate3d(0, 28px, 0)',
+        transform: visible ? undefined : 'translate3d(0, 32px, 0)',
       }}
     >
-      <div className="mb-4 flex items-end justify-between gap-4 px-4 sm:px-8 lg:px-12">
+      {/* Encabezado de la fila */}
+      <div className="mb-5 flex items-end justify-between gap-4 px-4 sm:px-8 lg:px-12">
         <div>
-          <h2 className="glow-effect flex items-center gap-2.5 font-display text-xl font-bold sm:text-2xl">
-            <span aria-hidden="true">{icon}</span>
+          <h2 className="glow-effect flex items-center gap-3 font-display text-xl font-bold sm:text-2xl lg:text-3xl">
+            <span className="text-2xl drop-shadow-[0_0_10px_rgba(255,215,0,0.6)]" aria-hidden="true">
+              {icon}
+            </span>
             {title}
           </h2>
-          <p className="mt-1 text-xs font-medium text-vellum/80 sm:text-sm">
+          <p className="mt-1.5 text-xs font-medium text-vellum/75 sm:text-sm">
             {description}
           </p>
         </div>
@@ -139,10 +139,10 @@ function CategoryRow({
             disabled={!canScrollLeft}
             aria-label={'Ver anterior en ' + title}
             className={
-              'flex h-9 w-9 items-center justify-center rounded-full border-2 transition-all duration-300 ' +
+              'flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all duration-300 ' +
               (canScrollLeft
-                ? 'border-gold bg-gold/15 text-gold-light hover:bg-gold hover:text-night'
-                : 'cursor-not-allowed border-gold/20 text-vellum/30')
+                ? 'border-gold bg-gold/15 text-gold-light shadow-[0_0_16px_rgba(255,215,0,0.3)] hover:bg-gold hover:text-night'
+                : 'cursor-not-allowed border-gold/20 text-vellum/25')
             }
           >
             <ChevronLeft className="h-5 w-5" />
@@ -153,10 +153,10 @@ function CategoryRow({
             disabled={!canScrollRight}
             aria-label={'Ver siguiente en ' + title}
             className={
-              'flex h-9 w-9 items-center justify-center rounded-full border-2 transition-all duration-300 ' +
+              'flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all duration-300 ' +
               (canScrollRight
-                ? 'border-gold bg-gold/15 text-gold-light hover:bg-gold hover:text-night'
-                : 'cursor-not-allowed border-gold/20 text-vellum/30')
+                ? 'border-gold bg-gold/15 text-gold-light shadow-[0_0_16px_rgba(255,215,0,0.3)] hover:bg-gold hover:text-night'
+                : 'cursor-not-allowed border-gold/20 text-vellum/25')
             }
           >
             <ChevronRight className="h-5 w-5" />
@@ -166,47 +166,50 @@ function CategoryRow({
 
       {/* Pista de peliculas */}
       <div className="relative">
+        {/* Velos laterales de fundido */}
         <div
           className={
-            'pointer-events-none absolute inset-y-0 left-0 z-20 w-10 bg-gradient-to-r from-night to-transparent transition-opacity duration-300 ' +
+            'pointer-events-none absolute inset-y-0 left-0 z-20 w-14 bg-gradient-to-r from-night to-transparent transition-opacity duration-300 ' +
             (canScrollLeft ? 'opacity-100' : 'opacity-0')
           }
         />
         <div
           className={
-            'pointer-events-none absolute inset-y-0 right-0 z-20 w-10 bg-gradient-to-l from-night to-transparent transition-opacity duration-300 ' +
+            'pointer-events-none absolute inset-y-0 right-0 z-20 w-14 bg-gradient-to-l from-night to-transparent transition-opacity duration-300 ' +
             (canScrollRight ? 'opacity-100' : 'opacity-0')
           }
         />
 
         {/* Estado de carga: pulsos que conservan el alto de la fila. */}
         {state === 'loading' && items.length === 0 && (
-          <div className="flex gap-3.5 overflow-hidden px-4 sm:px-8 lg:px-12">
+          <div className="flex gap-4 overflow-hidden px-4 sm:px-8 lg:px-12">
             {Array.from({ length: 6 }, (_, index) => (
               <div
                 key={index}
-                className="aspect-[2/3] w-[150px] shrink-0 animate-pulse rounded-lg border border-gold/20 bg-ink sm:w-[180px] lg:w-[196px]"
+                className="h-[360px] w-[240px] shrink-0 animate-pulse rounded-xl border border-gold/20 bg-ink"
               />
             ))}
           </div>
         )}
 
-        {/* Estado vacio explicito, mejor que una fila que no aparece. */}
+        {/* Estado vacio explicito. */}
         {state === 'ready' && items.length === 0 && (
           <p className="px-4 py-6 text-sm font-medium text-vellum/70 sm:px-8 lg:px-12">
             No hay hechizos de este tipo en {title} todavia.
           </p>
         )}
 
+        {/* Carrusel horizontal de tarjetas grandes */}
         <div
           ref={trackRef}
-          className="no-scrollbar flex snap-x snap-mandatory gap-3.5 overflow-x-auto px-4 pb-2 sm:px-8 lg:px-12"
+          className="no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-4 sm:px-8 lg:px-12"
           style={{ scrollbarWidth: 'none' }}
         >
           {items.map((item, index) => (
             <div
               key={item.id}
-              className="w-[150px] shrink-0 snap-start sm:w-[180px] lg:w-[196px]"
+              className="shrink-0 snap-start"
+              style={{ width: CARD_WIDTH + 'px' }}
             >
               <MovieCard
                 item={item}

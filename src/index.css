@@ -1,7 +1,7 @@
 @import 'tailwindcss';
 
 /* =========================================================================
-   POTTERFLIX — SISTEMA DE DISENO HOGWARTS
+   POTTERFLIX — SISTEMA DE DISENO HOGWARTS V4.0
    REGLA DE ORO: nunca texto oscuro sobre fondo oscuro. Todo el texto de
    contenido usa `vellum` (claro) o `gold`/`gold-light` (dorados). Los tonos
    oscuros (`night`, `parchment`, `ink`) son EXCLUSIVAMENTE superficies.
@@ -42,6 +42,7 @@
   --animate-candle-drift: candle-drift linear infinite;
   --animate-flame-flicker: flame-flicker 1.6s ease-in-out infinite;
   --animate-rune-glow: rune-glow 3.2s ease-in-out infinite;
+  --animate-gold-pulse: gold-pulse 2s ease-in-out infinite;
 }
 
 /* Aura de la casa activa, reescrita en caliente por el conmutador. */
@@ -70,6 +71,10 @@
   --house-secondary: #f4e4bc;
   --house-aura: rgba(255, 215, 94, 0.28);
 }
+
+/* =========================================================================
+   KEYFRAMES
+   ========================================================================= */
 
 @keyframes ember {
   0% {
@@ -195,6 +200,58 @@
   }
   100% {
     transform: translateX(-4%) scale(1);
+  }
+}
+
+@keyframes gold-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 10px rgba(255, 215, 0, 0.4),
+      0 0 30px rgba(255, 215, 0, 0.2);
+  }
+  50% {
+    box-shadow:
+      0 0 20px rgba(255, 215, 0, 0.7),
+      0 0 60px rgba(255, 215, 0, 0.4);
+  }
+}
+
+/* Entrada en cascada del cromo. DEBE estar fuera de @layer components para que
+   Tailwind la encuentre como animacion bare (sin prefijo). */
+@keyframes cromo-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+/* Destello dorado del hechizo Revelio al revelar el poster. */
+@keyframes revelio-flash {
+  0% {
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Flip 3D del cromo de Hogwarts */
+@keyframes card-flip-in {
+  from {
+    transform: perspective(800px) rotateY(-90deg);
+    opacity: 0;
+  }
+  to {
+    transform: perspective(800px) rotateY(0deg);
+    opacity: 1;
   }
 }
 
@@ -369,14 +426,25 @@
     animation: spell-ripple 1.1s ease-out forwards;
   }
 
+  /* ====================================================================
+     CROMO DE HOGWARTS V4.0 — TARJETAS GRANDES CON FLIP 3D
+     ==================================================================== */
+
+  /* Contenedor exterior: define la perspectiva 3D y el tamaño mínimo. */
+  .cromo-scene {
+    perspective: 900px;
+    perspective-origin: 50% 40%;
+  }
+
   /* Cromo de Hogwarts: filigrana dorada tallada sobre pergamino oscuro. */
   .cromo-frame {
     position: relative;
-    border: 2px solid rgb(255 215 0 / 0.55);
+    border: 2px solid rgb(255 215 0 / 0.6);
     box-shadow:
       inset 0 0 0 1px rgb(0 0 0 / 0.85),
-      inset 0 0 0 4px rgb(255 215 0 / 0.18),
-      inset 0 0 38px rgb(0 0 0 / 0.75);
+      inset 0 0 0 5px rgb(255 215 0 / 0.15),
+      inset 0 0 40px rgb(0 0 0 / 0.75),
+      0 8px 32px -8px rgb(0 0 0 / 0.9);
   }
 
   /* Esquina ornamentada del cromo. */
@@ -384,20 +452,21 @@
   .cromo-corner::after {
     content: '';
     position: absolute;
-    width: 22px;
-    height: 22px;
-    border: 2px solid rgb(255 215 0 / 0.85);
+    width: 28px;
+    height: 28px;
+    border: 2.5px solid rgb(255 215 0 / 0.9);
     pointer-events: none;
+    z-index: 10;
   }
   .cromo-corner::before {
-    top: 7px;
-    left: 7px;
+    top: 8px;
+    left: 8px;
     border-right: none;
     border-bottom: none;
   }
   .cromo-corner::after {
-    right: 7px;
-    bottom: 7px;
+    right: 8px;
+    bottom: 8px;
     border-left: none;
     border-top: none;
   }
@@ -405,9 +474,9 @@
   /* Destello dorado del hechizo Revelio. */
   .revelio-glow {
     box-shadow:
-      0 0 25px rgb(212 175 55 / 0.6),
-      0 0 60px rgb(255 215 0 / 0.28),
-      0 18px 44px -12px rgb(0 0 0 / 0.9);
+      0 0 30px rgb(212 175 55 / 0.65),
+      0 0 70px rgb(255 215 0 / 0.3),
+      0 20px 50px -12px rgb(0 0 0 / 0.9);
   }
 
   /* Capa acelerada por hardware: el navegador la promueve a su propia GPU. */
@@ -417,8 +486,62 @@
     backface-visibility: hidden;
   }
 
-  /* Entrada en cascada del cromo, sin coste en JS (ver MovieCard). */
+  /* Entrada en cascada del cromo. */
   .cromo-enter {
-    animation: cromo-enter 0.55s both cubic-bezier(0.22, 1, 0.36, 1);
+    animation: cromo-enter 0.6s both cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  /* ====================================================================
+     CARA TRASERA del cromo (poster revelado).
+     Oculta por defecto; el grupo hover la muestra girando el contenedor.
+     ==================================================================== */
+  .card-face {
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    transition: transform 0.65s cubic-bezier(0.4, 0.2, 0.2, 1);
+    transform-style: preserve-3d;
+  }
+
+  .card-face-front {
+    transform: rotateY(0deg);
+  }
+
+  .card-face-back {
+    transform: rotateY(180deg);
+    position: absolute;
+    inset: 0;
+  }
+
+  /* Cuando el contenedor tiene la clase `is-flipped`, gira ambas caras. */
+  .card-flipper {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+    transition: transform 0.65s cubic-bezier(0.4, 0.2, 0.2, 1);
+  }
+
+  .card-flipper.is-flipped {
+    transform: rotateY(180deg);
+  }
+
+  /* Destello de luz dorada durante el flip Revelio. */
+  .revelio-flash {
+    animation: revelio-flash 0.55s ease-out forwards;
+  }
+
+  /* Pulso dorado continuo en el sello de cera */
+  .animate-gold-pulse {
+    animation: gold-pulse 2s ease-in-out infinite;
+  }
+
+  /* Gradiente de texto en capas de sinopsis del modal */
+  .synopsis-box {
+    background:
+      linear-gradient(135deg, rgba(30, 28, 40, 0.97) 0%, rgba(18, 16, 26, 0.99) 100%);
+    border: 1px solid rgba(255, 215, 0, 0.2);
+    box-shadow:
+      inset 0 0 30px rgba(0, 0, 0, 0.5),
+      0 0 0 1px rgba(255, 215, 0, 0.08);
   }
 }
