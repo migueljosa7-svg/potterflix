@@ -16,8 +16,8 @@ interface Particle {
   life: number
   maxLife: number
   size: number
-  /** 0 = dorado Snitch, 1 = azul magico (misma paleta que la varita). */
-  kind: 0 | 1
+  /** 0 = oro #gold, 1 = plata, 2 = púrpura #violet (misma paleta que la varita). */
+  kind: 0 | 1 | 2
 }
 
 /**
@@ -67,8 +67,15 @@ export default function WandSparks() {
     resize()
     window.addEventListener('resize', resize, { passive: true })
 
-    /* Sprites compartidos con WandCursor: un canvas por tono, ya renderizado. */
-    const sprites = { gold: makeSparkSprite(45), blue: makeSparkSprite(205) }
+    /* Sprites compartidos con WandCursor: un canvas por tono, ya renderizado.
+       Oro #d4af37, plata #e0e0e0 y púrpura #8a2be2. */
+    const sprites = {
+      gold: makeSparkSprite(45),
+      silver: makeSparkSprite(0, 0),
+      violet: makeSparkSprite(280),
+    }
+    const spriteFor = (kind: Particle['kind']) =>
+      kind === 0 ? sprites.gold : kind === 1 ? sprites.silver : sprites.violet
 
     let particles: Particle[] = []
     let frame = 0
@@ -89,7 +96,7 @@ export default function WandSparks() {
           life,
           maxLife: life,
           size: 1.5 + Math.random() * 2.8,
-          kind: Math.random() > 0.78 ? 1 : 0,
+          kind: Math.random() < 0.55 ? 0 : Math.random() < 0.62 ? 1 : 2,
         })
       }
     }
@@ -117,7 +124,7 @@ export default function WandSparks() {
         const diameter = radius * 8
         ctx.globalAlpha = progress * progress
         ctx.drawImage(
-          particle.kind === 0 ? sprites.gold : sprites.blue,
+          spriteFor(particle.kind),
           particle.x - diameter / 2,
           particle.y - diameter / 2,
           diameter,

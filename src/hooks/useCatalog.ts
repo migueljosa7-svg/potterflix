@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { loadHero, loadRow, resolveTrailer, search as searchApi } from '../services/tmdb'
+import { loadRow, resolveTrailer, search as searchApi } from '../services/tmdb'
+import {
+  getPublicDetails,
+  loadPublicHero,
+  loadPublicRow,
+  searchPublic,
+} from '../services/publicApi'
 import type { CategoryId, LoadState, MediaItem, MediaType } from '../types/tmdb'
 
 /**
@@ -29,11 +35,20 @@ export function useCatalog(
     let active = true
 
     setState('loading')
-    loadRow(category, mediaType, controller.signal)
+    // Cero-creds primero: TVMaze público; si falla, `loadRow` cae al local.
+    loadPublicRow(category, controller.signal)
       .then((rows) => {
-        if (!active) return
-        setItems(rows)
-        setState('ready')
+        if (!active || rows.length > 0) {
+          if (!active) return
+          setItems(rows)
+          setState('ready')
+          return
+        }
+        return loadRow(category, mediaType, controller.signal).then((fallback) => {
+          if (!active) return
+          setItems(fallback)
+          setState('ready')
+        })
       })
       .catch(() => {
         // loadRow ya cae al respaldo; solo queda el caso de abort.
@@ -62,7 +77,7 @@ export function useHero(enabled: boolean) {
     let active = true
 
     setState('loading')
-    loadHero(controller.signal)
+    loadPublicHero(controller.signal)
       .then((rows) => {
         if (!active) return
         setItems(rows)
@@ -114,11 +129,20 @@ export function useSearch(delay = 300) {
     controllerRef.current = controller
 
     timerRef.current = window.setTimeout(() => {
-      searchApi(term, controller.signal)
+      // Público primero (sin clave); el local filtra si no hay red.
+      searchPublic(term, controller.signal)
         .then((items) => {
           if (controller.signal.aborted) return
-          setResults(items)
-          setState('ready')
+          if (items.length > 0) {
+            setResults(items)
+            setState('ready')
+            return
+          }
+          return searchApi(term, controller.signal).then((fallback) => {
+            if (controller.signal.aborted) return
+            setResults(fallback)
+            setState('ready')
+          })
         })
         .catch(() => {
           if (controller.signal.aborted) return
@@ -159,7 +183,9 @@ export function useTrailer(item: MediaItem | null) {
     const controller = new AbortController()
     setLoading(true)
 
-    resolveTrailer(item, controller.signal)
+    // Detalle público primero (cast TVMaze); trailer TMDB solo con clave.
+    getPublicDetails(item, controller.signal)
+      .then(() => resolveTrailer(item, controller.signal))
       .then((value) => {
         if (!controller.signal.aborted) setKey(value)
       })

@@ -10,8 +10,8 @@ interface Spark {
   life: number
   maxLife: number
   size: number
-  /** Tono de la chispa: dorado Snitch (45) o azul magico (205). */
-  hue: 45 | 205
+  /** Tono de la chispa: oro #d4af37 (45), plata #e0e0e0 (0/sat 0) y púrpura #8a2be2 (280). */
+  hue: 45 | 0 | 280
 }
 
 /** Rapidez con la que la varita persigue al puntero (0-1). */
@@ -29,7 +29,17 @@ const IDLE_FRAMES = 20
 
 /**
  * WandCursor - Sustituye el puntero del raton por una varita magica que
- * proyecta una estela de chispas doradas y azules.
+ * proyecta una estela tricolor de chispas oro/plata/purpura (#gold/#amber/#violet).
+ *
+ * FISICA (60 FPS, Canvas overlay):
+ *  - Un unico bucle `requestAnimationFrame`: `pointermove` solo escribe dos
+ *    numeros y nunca provoca renderizados de React.
+ *  - Estela por distancia (SPAWN_DISTANCE), no por fotograma: gravedad leve
+ *    hacia arriba, friccion 0.94 y desvanecimiento progresivo (alpha=progress^2).
+ *  - Sprites pre-renderizados oro/plata/purpura + `lighter` aditivo en GPU.
+ *  - Spell burst al hacer clic en elementos interactivos (22 chispas radiales).
+ *  - Bucle con apagado automatico (IDLE_FRAMES), pausa en tab oculta y respeto
+ *    a `prefers-reduced-motion` y puntero grueso.
  *
  * OPTIMIZACIONES CLAVE (antes saturaba el hilo principal):
  *  1. Un unico bucle de `requestAnimationFrame`: el evento `pointermove` solo
@@ -38,7 +48,7 @@ const IDLE_FRAMES = 20
  *     lugar de `createRadialGradient()` por chispa y fotograma.
  *  3. El bucle se detiene por completo cuando no hay movimiento ni chispas
  *     (`IDLE_FRAMES`), dejando el hilo principal libre al 100 %.
- *  4. Se pausa al ocultar la pesta├▒a.
+ *  4. Se pausa al ocultar la pestaña.
  *  5. `globalCompositeOperation = 'lighter'` deja el destello aditivo a la GPU.
  */
 export default function WandCursor() {
@@ -74,8 +84,15 @@ export default function WandCursor() {
     resize()
     window.addEventListener('resize', resize, { passive: true })
 
-    /* Sprites pre-renderizados (compartidos con WandSparks), una sola vez. */
-    const sprites = { gold: makeSparkSprite(45), blue: makeSparkSprite(205) }
+    /* Sprites pre-renderizados (compartidos con WandSparks), una sola vez.
+       Oro #d4af37 (45), plata #e0e0e0 (luna, saturación 0) y púrpura #8a2be2 (280). */
+    const sprites = {
+      gold: makeSparkSprite(45),
+      silver: makeSparkSprite(0, 0),
+      violet: makeSparkSprite(280),
+    }
+    const spriteFor = (hue: Spark['hue']) =>
+      hue === 45 ? sprites.gold : hue === 0 ? sprites.silver : sprites.violet
 
     // Posicion real del raton y posicion suavizada de la varita.
     const pointer = { x: width / 2, y: height / 2 }
@@ -104,8 +121,18 @@ export default function WandCursor() {
     const onLeave = () => {
       hovering = false
     }
-    const onDown = () => {
+    const onDown = (event: PointerEvent) => {
       pressing = true
+      // Spell burst: al pulsar sobre un control interactivo, estallido radial
+      // tricolor en la punta de la varita (rAF, sin setState de React).
+      const target = event.target as HTMLElement | null
+      if (target && target.closest('button, a, [role="button"], input, select, textarea')) {
+        burst(wand.x, wand.y, 22)
+      } else {
+        burst(wand.x, wand.y, 8)
+      }
+      idleFrames = 0
+      if (!frame && !paused) frame = window.requestAnimationFrame(draw)
     }
     const onUp = () => {
       pressing = false
@@ -124,7 +151,15 @@ export default function WandCursor() {
     document.addEventListener('mouseleave', onLeave)
     document.addEventListener('visibilitychange', onVisibility)
 
-    /** Emite una chispa en la punta de la varita. */
+    /** Tono tricolor de la estela: oro #d4af37, plata #e0e0e0 y púrpura #8a2be2. */
+    const pickHue = (): Spark['hue'] => {
+      const roll = Math.random()
+      if (roll < 0.55) return 45
+      if (roll < 0.8) return 0
+      return 280
+    }
+
+    /** Emite una chispa en la punta de la varita (gravedad + fricción + fade). */
     const emit = (x: number, y: number, boost: number) => {
       if (sparks.length >= MAX_SPARKS) return
       const angle = Math.random() * Math.PI * 2
@@ -139,8 +174,28 @@ export default function WandCursor() {
         life: maxLife,
         maxLife: maxLife,
         size: (Math.random() * 2.1 + 0.7) * boost,
-        hue: Math.random() > 0.35 ? 45 : 205,
+        hue: pickHue(),
       })
+    }
+
+    /** Estallido radial de hechizo (clic): ráfaga tricolor de alta energía. */
+    const burst = (x: number, y: number, count: number) => {
+      const total = Math.max(4, Math.min(Math.round(count), 30))
+      for (let i = 0; i < total && sparks.length < MAX_SPARKS; i += 1) {
+        const angle = Math.random() * Math.PI * 2
+        const speed = 1.8 + Math.random() * 3.4
+        const maxLife = 36 + Math.random() * 30
+        sparks.push({
+          x,
+          y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 0.6,
+          life: maxLife,
+          maxLife,
+          size: 1.4 + Math.random() * 2.4,
+          hue: pickHue(),
+        })
+      }
     }
 const draw = () => {
       frame = window.requestAnimationFrame(draw)
@@ -193,7 +248,7 @@ const draw = () => {
 
         ctx.globalAlpha = progress * progress
         ctx.drawImage(
-          spark.hue === 45 ? sprites.gold : sprites.blue,
+          spriteFor(spark.hue),
           spark.x - diameter / 2,
           spark.y - diameter / 2,
           diameter,

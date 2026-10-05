@@ -163,10 +163,18 @@ function pickTrailer(videos: TmdbVideo[]): string | null {
 /**
  * Peticion GET a TMDB con timeout y cancelacion.
  *
+ * GUARD ANTI-401: si no hay `VITE_TMDB_API_KEY`, falla en local sin tocar la
+ * red —asi nunca se emite `api_key=` vacio y la consola queda limpia—. Quien
+ * llama ya conmuta al catalogo local (`hasApiKey`), pero este guard cubre
+ * tambien las rutas bajas (`getDetails`/`getTrailerKey`).
+ *
  * Lanza `AbortError` si se cancela y `Error` ante cualquier fallo de red o
  * credenciales, de modo que quien llama pueda recurrir siempre al respaldo.
  */
 async function request<T>(path: string, signal?: AbortSignal): Promise<T> {
+  if (!hasApiKey) {
+    throw new Error('TMDB sin api_key: bypass al catálogo local')
+  }
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT)
   // Encadena la cancelacion externa con el timeout interno.
@@ -230,6 +238,8 @@ function toMediaItem(
 export async function getTrending(
   signal?: AbortSignal,
 ): Promise<MediaItem[]> {
+  // Sin clave, el llamante (`loadHero`) cae al fallback sin tocar la red.
+  if (!hasApiKey) return []
   const data = await request<TmdbListResponse<TmdbMovieResult>>(
     '/trending/all/week',
     signal,
@@ -276,6 +286,8 @@ export async function discoverByGenre(
   page = 1,
   signal?: AbortSignal,
 ): Promise<MediaItem[]> {
+  // Sin clave no hay discover: lista vacia para que `loadRow` use el fallback.
+  if (!hasApiKey) return []
   const path =
     mediaType === 'movie' ? '/discover/movie' : '/discover/tv'
   const valid = genreIdsForMedia(genreIds, mediaType)
@@ -294,6 +306,8 @@ export async function searchMulti(
   query: string,
   signal?: AbortSignal,
 ): Promise<MediaItem[]> {
+  // Sin clave no hay busqueda remota: `search` filtra el catalogo local.
+  if (!hasApiKey) return []
   const data = await request<TmdbListResponse<TmdbMovieResult>>(
     `/search/multi?query=${encodeURIComponent(query)}` +
       '&include_adult=false&page=1',
@@ -318,6 +332,8 @@ export async function getTrailerKey(
   mediaType: MediaType,
   signal?: AbortSignal,
 ): Promise<string | null> {
+  // Sin clave no se emite `api_key=` vacio: se resuelve a nulo sin red.
+  if (!hasApiKey || tmdbId === 0) return null
   try {
     const data = await request<TmdbVideoResponse>(
       `/${mediaType}/${tmdbId}/videos`,
@@ -338,7 +354,8 @@ export async function getDetails(
   item: MediaItem,
   signal?: AbortSignal,
 ): Promise<MediaItem> {
-  if (item.tmdbId === 0) return item
+  // Sin clave o sin id real no hay nada que pedir: bypass inmediato al local.
+  if (!hasApiKey || item.tmdbId === 0) return item
   try {
     const data = await request<{
       tagline?: string
