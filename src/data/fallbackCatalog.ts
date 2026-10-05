@@ -1,19 +1,13 @@
-import type { Movie } from '../types'
-import { HOUSE_ACCENTS, HOUSES } from './mockMovies'
+import type { MediaItem } from '../types/tmdb'
+import { FALLBACK_SEEDS, trailerForSeed, type FallbackSeed } from './fallbackSeeds'
 
-/**
- * Generador de arte procedural para los cromos de Hogwarts.
- *
- * Por que NO usamos imagenes externas:
- *  - Los posters oficiales estan bajo derechos de autor y sus CDN bloquean o
- *    restringen el hotlinking, lo que produce imagenes rotas.
- *  - Un SVG generado en el cliente pesa menos de 1 KB, no hace peticiones de
- *    red, no provoca layout shift (CLS) y nunca puede fallar.
- *
- * El resultado es un cartel gotico con escudo de la casa, filigrana dorada,
- * runas y el titulo de la pelicula. Si mas adelante se anaden posters reales
- * al catalogo, `Movie.poster` / `Movie.backdrop` tienen prioridad sobre esto.
- */
+/* ==========================================================================
+   ARTE PROCEDURAL
+   ==============
+   Los posters de TMDB solo existen si hay API key. En modo demo generamos el
+   arte por codigo: SVG de menos de 1 KB, sin peticiones de red, sin layout
+   shift y sin riesgo de imagen rota. Si TMDB responde, manda su poster real.
+   ========================================================================== */
 
 /** PRNG determinista: la misma semilla produce siempre el mismo cartel. */
 export function seededRandom(seed: number) {
@@ -34,8 +28,8 @@ export function hashSeed(value: string): number {
   return hash >>> 0
 }
 
-/** Escapa caracteres especiales para poder incrustar texto en el SVG. */
-export function escapeXml(value: string): string {
+/** Escapa caracteres especiales para incrustar texto en el SVG. */
+function escapeXml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -45,7 +39,7 @@ export function escapeXml(value: string): string {
 }
 
 /** Divide un titulo en lineas cortas que caben en el ancho del poster. */
-export function wrapTitle(title: string, maxChars: number): string[] {
+function wrapTitle(title: string, maxChars: number): string[] {
   const words = title.split(' ')
   const lines: string[] = []
   let current = ''
@@ -63,31 +57,28 @@ export function wrapTitle(title: string, maxChars: number): string[] {
   return lines
 }
 
-/** Devuelve el color de acento luminoso de la casa a la que pertenece. */
-export function accentFor(movie: Movie): string {
-  return HOUSE_ACCENTS[movie.house]
-}
-
-/** Devuelve los datos de la casa a la que pertenece la pelicula. */
-export function houseFor(movie: Movie) {
-  return HOUSES.find((item) => item.id === movie.house)
-}
-
 /** Empaqueta un SVG en un data-URI listo para el atributo `src`. */
-export function toDataUri(svg: string): string {
+function toDataUri(svg: string): string {
   return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg)
 }
 
+/** Acento de la casa, en version importable por el generador de arte. */
+const ACCENTS: Record<MediaItem['house'], string> = {
+  gryffindor: '#ff8a7a',
+  slytherin: '#7dfcb0',
+  ravenclaw: '#a9c8ff',
+  hufflepuff: '#ffd75e',
+}
+
 /**
- * Genera el data-URI SVG de un póster vertical con estética de cromo mágico:
- * pergamino oscuro, filigrana dorada, escudo de la casa y runas encendidas.
+ * Genera un poster vertical con estetica de cromo de Hogwarts: pergamino
+ * oscuro, filigrana dorada, escudo de la casa y runas encendidas.
  */
-export function generatePoster(movie: Movie, width = 600, height = 900): string {
-  const random = seededRandom(hashSeed(movie.id))
-  const accent = accentFor(movie)
-  const house = houseFor(movie)
-  const sigil = movie.sigil ?? house?.sigil ?? '✦'
-  const titleLines = wrapTitle(movie.title.toUpperCase(), 16)
+function generatePoster(seed: FallbackSeed, width = 600, height = 900): string {
+  const random = seededRandom(hashSeed(seed.id))
+  const accent = ACCENTS[seed.house]
+  const sigil = seed.sigil
+  const titleLines = wrapTitle(seed.title.toUpperCase(), 16)
 
   let stars = ''
   for (let i = 0; i < 70; i += 1) {
@@ -155,24 +146,23 @@ export function generatePoster(movie: Movie, width = 600, height = 900): string 
     `<path d="M-104 -108 L104 -108 L104 -14 L0 28 L-104 -14 Z" fill="${accent}" opacity="0.26"/>` +
     `<text x="0" y="14" font-size="84" text-anchor="middle" font-family="Segoe UI Emoji, sans-serif">${sigil}</text>` +
     `<path d="M-66 74 L0 42 L66 74 L66 94 L0 62 L-66 94 Z" fill="none" stroke="url(#gold)" stroke-width="2.4" opacity="0.9"/>` +
-    '<text x="0" y="126" font-size="23" letter-spacing="3.5" text-anchor="middle" ' +
-    `fill="#ffe9a8" font-family="Cinzel, Georgia, serif">${escapeXml((house?.name ?? '').toUpperCase())}</text>` +
+    `<text x="0" y="126" font-size="21" letter-spacing="3.5" text-anchor="middle" ` +
+    `fill="#ffe9a8" font-family="Cinzel, Georgia, serif">${escapeXml(seed.house.toUpperCase())}</text>` +
     '</g>' +
     `<rect x="44" y="${height - 210}" width="${width - 88}" height="${titleLines.length * 34 + 40}" ` +
     'fill="#170f09" opacity="0.86" stroke="url(#gold)" stroke-width="2" rx="8"/>' +
     titleMarkup +
     `<text x="${width / 2}" y="${height - 42}" fill="${accent}" font-size="18" letter-spacing="5" ` +
     'text-anchor="middle" font-family="Cinzel, Georgia, serif">' +
-    `${escapeXml(String(movie.year))} · ${escapeXml(movie.rating)}</text>` +
+    `${seed.year} · ${escapeXml(seed.rating)}</text>` +
     '</svg>'
 
   return toDataUri(svg)
 }
-
 /** Genera un fondo panoramico 16:9 con la silueta del castillo a contraluz. */
-export function generateBackdrop(movie: Movie, width = 1600, height = 900): string {
-  const random = seededRandom(hashSeed(movie.id + '-bg'))
-  const accent = accentFor(movie)
+function generateBackdrop(seed: FallbackSeed, width = 1600, height = 900): string {
+  const random = seededRandom(hashSeed(seed.id + '-bg'))
+  const accent = ACCENTS[seed.house]
 
   let dust = ''
   for (let i = 0; i < 110; i += 1) {
@@ -221,13 +211,32 @@ export function generateBackdrop(movie: Movie, width = 1600, height = 900): stri
 
   return toDataUri(svg)
 }
-
-/** Devuelve el poster de la pelicula, priorizando una URL real si existe. */
-export function posterFor(movie: Movie): string {
-  return movie.poster ?? generatePoster(movie)
-}
-
-/** Devuelve el fondo de la pelicula, priorizando una URL real si existe. */
-export function backdropFor(movie: Movie): string {
-  return movie.backdrop ?? generateBackdrop(movie)
-}
+/* ==========================================================================
+   CATALOGO DE RESPALDO
+   ========================================================================== */
+/**
+ * Catalogo de respaldo ya normalizado al tipo `MediaItem`.
+ * Es la unica fuente de datos cuando no hay API key de TMDB.
+ */
+export const FALLBACK_CATALOG: MediaItem[] = FALLBACK_SEEDS.map((seed) => ({
+  id: 'movie-' + seed.tmdbId,
+  tmdbId: seed.tmdbId,
+  mediaType: 'movie' as const,
+  title: seed.title,
+  originalTitle: seed.originalTitle,
+  tagline: seed.tagline,
+  synopsis: seed.synopsis,
+  year: seed.year,
+  durationMinutes: seed.minutes,
+  score: seed.score,
+  house: seed.house,
+  category: seed.house,
+  genres: seed.genres,
+  cast: seed.cast,
+  poster: generatePoster(seed),
+  backdrop: generateBackdrop(seed),
+  trailerKey: trailerForSeed(seed.id),
+  featured: seed.featured,
+  badge: seed.badge,
+  sigil: seed.sigil,
+}))

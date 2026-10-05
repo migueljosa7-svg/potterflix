@@ -1,12 +1,19 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import type { Category, Movie } from '../types'
+import type { LoadState, MediaItem } from '../types/tmdb'
 import MovieCard from './MovieCard'
 
 interface CategoryRowProps {
-  category: Category
-  movies: Movie[]
-  onSelect: (movie: Movie) => void
+  title: string
+  icon: string
+  description: string
+  items: MediaItem[]
+  state: LoadState
+  /** Identificador de la fila, para el anclaje del menu. */
+  id: string
+  onSelect: (item: MediaItem) => void
+  savedIds: Set<string>
+  onToggleSave: (item: MediaItem) => void
 }
 
 /** Ancho de cada tarjeta en px, usado para calcular el desplazamiento. */
@@ -24,7 +31,17 @@ const GAP = 14
  * Ademas se usa IntersectionObserver en vez de animaciones de framer-motion por
  * fila, que registraban un observador por seccion.
  */
-function CategoryRow({ category, movies, onSelect }: CategoryRowProps) {
+function CategoryRow({
+  title,
+  icon,
+  description,
+  items,
+  state,
+  id,
+  onSelect,
+  savedIds,
+  onToggleSave,
+}: CategoryRowProps) {
   const trackRef = useRef<HTMLDivElement | null>(null)
   const sectionRef = useRef<HTMLElement | null>(null)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
@@ -62,7 +79,7 @@ function CategoryRow({ category, movies, onSelect }: CategoryRowProps) {
       track.removeEventListener('scroll', onScroll)
       window.removeEventListener('resize', onScroll)
     }
-  }, [syncArrows, movies.length])
+  }, [syncArrows, items.length])
 
   // Revela la fila una sola vez al entrar en pantalla.
   useEffect(() => {
@@ -93,27 +110,24 @@ function CategoryRow({ category, movies, onSelect }: CategoryRowProps) {
     })
   }
 
-  if (movies.length === 0) return null
-
   return (
     <section
       ref={sectionRef}
-      id={category.id}
+      id={id}
       className="group/row relative mb-14 scroll-mt-28 transition-opacity duration-700"
       style={{
         opacity: visible ? 1 : 0,
-        transform: visible ? 'none' : 'translate3d(0, 28px, 0)',
+        transform: visible ? undefined : 'translate3d(0, 28px, 0)',
       }}
     >
-{/* Encabezado de la fila */}
       <div className="mb-4 flex items-end justify-between gap-4 px-4 sm:px-8 lg:px-12">
         <div>
           <h2 className="glow-effect flex items-center gap-2.5 font-display text-xl font-bold sm:text-2xl">
-            <span aria-hidden="true">{category.icon}</span>
-            {category.title}
+            <span aria-hidden="true">{icon}</span>
+            {title}
           </h2>
           <p className="mt-1 text-xs font-medium text-vellum/80 sm:text-sm">
-            {category.description}
+            {description}
           </p>
         </div>
 
@@ -123,7 +137,7 @@ function CategoryRow({ category, movies, onSelect }: CategoryRowProps) {
             type="button"
             onClick={() => scrollByCards(-1)}
             disabled={!canScrollLeft}
-            aria-label={'Ver anterior en ' + category.title}
+            aria-label={'Ver anterior en ' + title}
             className={
               'flex h-9 w-9 items-center justify-center rounded-full border-2 transition-all duration-300 ' +
               (canScrollLeft
@@ -137,7 +151,7 @@ function CategoryRow({ category, movies, onSelect }: CategoryRowProps) {
             type="button"
             onClick={() => scrollByCards(1)}
             disabled={!canScrollRight}
-            aria-label={'Ver siguiente en ' + category.title}
+            aria-label={'Ver siguiente en ' + title}
             className={
               'flex h-9 w-9 items-center justify-center rounded-full border-2 transition-all duration-300 ' +
               (canScrollRight
@@ -152,14 +166,12 @@ function CategoryRow({ category, movies, onSelect }: CategoryRowProps) {
 
       {/* Pista de peliculas */}
       <div className="relative">
-        {/* Desvanecido lateral izquierdo */}
         <div
           className={
             'pointer-events-none absolute inset-y-0 left-0 z-20 w-10 bg-gradient-to-r from-night to-transparent transition-opacity duration-300 ' +
             (canScrollLeft ? 'opacity-100' : 'opacity-0')
           }
         />
-        {/* Desvanecido lateral derecho */}
         <div
           className={
             'pointer-events-none absolute inset-y-0 right-0 z-20 w-10 bg-gradient-to-l from-night to-transparent transition-opacity duration-300 ' +
@@ -167,17 +179,42 @@ function CategoryRow({ category, movies, onSelect }: CategoryRowProps) {
           }
         />
 
+        {/* Estado de carga: pulsos que conservan el alto de la fila. */}
+        {state === 'loading' && items.length === 0 && (
+          <div className="flex gap-3.5 overflow-hidden px-4 sm:px-8 lg:px-12">
+            {Array.from({ length: 6 }, (_, index) => (
+              <div
+                key={index}
+                className="aspect-[2/3] w-[150px] shrink-0 animate-pulse rounded-lg border border-gold/20 bg-ink sm:w-[180px] lg:w-[196px]"
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Estado vacio explicito, mejor que una fila que no aparece. */}
+        {state === 'ready' && items.length === 0 && (
+          <p className="px-4 py-6 text-sm font-medium text-vellum/70 sm:px-8 lg:px-12">
+            No hay hechizos de este tipo en {title} todavia.
+          </p>
+        )}
+
         <div
           ref={trackRef}
           className="no-scrollbar flex snap-x snap-mandatory gap-3.5 overflow-x-auto px-4 pb-2 sm:px-8 lg:px-12"
           style={{ scrollbarWidth: 'none' }}
         >
-          {movies.map((movie, index) => (
+          {items.map((item, index) => (
             <div
-              key={movie.id}
+              key={item.id}
               className="w-[150px] shrink-0 snap-start sm:w-[180px] lg:w-[196px]"
             >
-              <MovieCard movie={movie} index={index} onSelect={onSelect} />
+              <MovieCard
+                item={item}
+                index={index}
+                onSelect={onSelect}
+                saved={savedIds.has(item.id)}
+                onToggleSave={onToggleSave}
+              />
             </div>
           ))}
         </div>

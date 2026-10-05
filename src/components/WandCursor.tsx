@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+﻿import { useEffect, useRef } from 'react'
 
 /** Una chispa individual de la estela de la varita. */
 interface Spark {
@@ -43,7 +43,7 @@ const IDLE_FRAMES = 20
  *     lugar de `createRadialGradient()` por chispa y fotograma.
  *  3. El bucle se detiene por completo cuando no hay movimiento ni chispas
  *     (`IDLE_FRAMES`), dejando el hilo principal libre al 100 %.
- *  4. Se pausa al ocultar la pestaña.
+ *  4. Se pausa al ocultar la pesta├▒a.
  *  5. `globalCompositeOperation = 'lighter'` deja el destello aditivo a la GPU.
  */
 export default function WandCursor() {
@@ -121,7 +121,7 @@ export default function WandCursor() {
       pointer.y = event.clientY
       hovering = true
       idleFrames = 0
-      // Si el bucle esta dormido (pestaña inactiva), lo despertamos.
+      // Si el bucle esta dormido (pesta├▒a inactiva), lo despertamos.
       if (!frame && !paused) frame = window.requestAnimationFrame(draw)
     }
     const onLeave = () => {
@@ -286,7 +286,7 @@ function drawWand(
   ctx.roundRect(-length, -2.6, 11, 5.2, 2.6)
   ctx.fill()
 
-  // Empuñadura de cuero
+  // Empu├▒adura de cuero
   ctx.fillStyle = '#1a1310'
   ctx.fillRect(-length + 2, -2.6, 3, 5.2)
 

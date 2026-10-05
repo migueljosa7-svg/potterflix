@@ -1,5 +1,5 @@
-import { useMemo } from 'react'
-import { seededRandom, hashSeed } from '../data/filmArt'
+﻿import { useMemo } from 'react'
+import { seededRandom, hashSeed } from '../data/fallbackCatalog'
 
 /** Numero de velas en pantalla. Bajo a proposito: cada una es un elemento. */
 const CANDLE_COUNT = 18

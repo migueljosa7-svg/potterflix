@@ -1,13 +1,15 @@
 import { memo, useRef, useState } from 'react'
-import { Eye, Play, Star } from 'lucide-react'
-import type { Movie } from '../types'
-import { HOUSE_ACCENTS } from '../data/mockMovies'
-import { posterFor } from '../data/filmArt'
+import { Check, Eye, Play, Plus, Star } from 'lucide-react'
+import type { MediaItem } from '../types/tmdb'
+import { HOUSES } from '../services/tmdb'
 
 interface MovieCardProps {
-  movie: Movie
+  item: MediaItem
   index: number
-  onSelect: (movie: Movie) => void
+  onSelect: (item: MediaItem) => void
+  /** Si el titulo esta en "Mi Lista de Hechizos". */
+  saved: boolean
+  onToggleSave: (item: MediaItem) => void
 }
 
 /**
@@ -16,7 +18,7 @@ interface MovieCardProps {
  * ESTADO OCULTO: pergamino oscuro con filigrana dorada tallada, esquinas
  * ornamentadas y un sello de cera en relieve con runas que brillan.
  * ESTADO REVELADO: al pasar la varita por encima, la carta emite un destello
- * dorado, el sello se disipa y aparece el poster a alta calidad.
+ * dorado, el sello se disipa y aparece el poster HD de TMDB.
  *
  * RENDIMIENTO: el hechizo Revelio se resuelve con CSS `:hover` / `:focus-visible`
  * mediante el grupo `group`, NO con `onMouseEnter` + `setState`. Antes, cada
@@ -24,13 +26,12 @@ interface MovieCardProps {
  * navegador resuelve el efecto en su propia capa compuesta y React no vuelve
  * a renderizar. El unico estado que queda es el toque en tactil.
  */
-function MovieCard({ movie, index, onSelect }: MovieCardProps) {
+function MovieCard({ item, index, onSelect, saved, onToggleSave }: MovieCardProps) {
   // Solo se usa en tactil, donde no existe el hover de CSS.
   const [revealedByTouch, setRevealedByTouch] = useState(false)
   const touchRevealed = useRef(false)
 
-  const accent = HOUSE_ACCENTS[movie.house]
-  const poster = posterFor(movie)
+  const accent = HOUSES.find((house) => house.id === item.house)?.accent ?? '#ffd75e'
 
   /** En tactil el primer toque revela y el segundo abre el modal. */
   const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -45,7 +46,7 @@ function MovieCard({ movie, index, onSelect }: MovieCardProps) {
       setRevealedByTouch(true)
       return
     }
-    onSelect(movie)
+    onSelect(item)
   }
 
   // En tactil la carta queda revelada para siempre tras el primer toque.
@@ -55,7 +56,7 @@ function MovieCard({ movie, index, onSelect }: MovieCardProps) {
     <button
       type="button"
       onClick={handleClick}
-      aria-label={'Ver ' + movie.title}
+      aria-label={'Ver ' + item.title}
       className="cromo-enter group relative block aspect-[2/3] w-full shrink-0 overflow-hidden rounded-lg text-left outline-none transition-transform duration-500 ease-out hover:scale-[1.045] focus-visible:scale-[1.045]"
       style={{ animationDelay: Math.min(index * 0.05, 0.4) + 's' }}
     >
@@ -79,15 +80,14 @@ function MovieCard({ movie, index, onSelect }: MovieCardProps) {
         {/* Sello de cera de Hogwarts en relieve, con runas encendidas */}
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
           <div className="wax-seal relative flex h-20 w-20 items-center justify-center rounded-full">
-            {/* Runas magicas alrededor del sello */}
             <span className="animate-rune-glow absolute -inset-3 font-display text-[0.7rem] leading-none text-gold/70">
               <span className="absolute -top-2 left-1/2 -translate-x-1/2">ᚠ</span>
               <span className="absolute -bottom-2 left-1/2 -translate-x-1/2">ᚱ</span>
               <span className="absolute left-0 top-1/2 -translate-y-1/2">ᛉ</span>
               <span className="absolute right-0 top-1/2 -translate-y-1/2">ᛟ</span>
             </span>
-            <span className="font-display text-2xl font-black text-amber-50 drop-shadow-[0_2px_3px_rgba(0,0,0,0.8)]">
-              H
+            <span className="text-2xl" aria-hidden="true">
+              {item.sigil ?? '✦'}
             </span>
           </div>
 
@@ -99,19 +99,19 @@ function MovieCard({ movie, index, onSelect }: MovieCardProps) {
         {/* Placa de pergamino con el titulo */}
         <div className="absolute inset-x-2 bottom-2 rounded border border-gold/45 bg-[#1a1510]/92 px-2 py-2 text-center">
           <h3 className="line-clamp-2 font-display text-[0.72rem] font-bold leading-tight text-gold-light">
-            {movie.title}
+            {item.title}
           </h3>
         </div>
       </div>
 
-      {/* ============ ESTADO REVELADO: POSTER ============ */}
+      {/* ============ ESTADO REVELADO: POSTER DE TMDB ============ */}
       <div
         className="absolute inset-0 transition-opacity duration-500 group-hover:opacity-100 group-focus-visible:opacity-100"
         style={{ opacity: touched ? 1 : 0 }}
       >
         <img
-          src={poster}
-          alt={'Poster de ' + movie.title}
+          src={item.poster}
+          alt={'Poster de ' + item.title}
           loading="lazy"
           decoding="async"
           className="gpu h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
@@ -120,8 +120,13 @@ function MovieCard({ movie, index, onSelect }: MovieCardProps) {
         <div className="absolute inset-0 bg-gradient-to-t from-night via-night/45 to-night/10" />
       </div>
 
-      {/* Badge de la casa / novedad: siempre con fondo opaco y texto claro. */}
-      {movie.badge && (
+      {/* Destello dorado del hechizo Revelio */}
+      <span
+        className="revelio-glow pointer-events-none absolute inset-0 rounded-lg opacity-0 ring-1 ring-inset ring-gold/50 transition-opacity duration-300 group-hover:opacity-100 group-focus-visible:opacity-100"
+        aria-hidden="true"
+      />
+{/* Badge de la casa / novedad: siempre con fondo opaco y texto claro. */}
+      {item.badge && (
         <span
           className="absolute left-2.5 top-2.5 z-30 rounded-sm border px-2 py-0.5 font-display text-[0.55rem] font-bold uppercase tracking-[0.18em]"
           style={{
@@ -130,37 +135,65 @@ function MovieCard({ movie, index, onSelect }: MovieCardProps) {
             color: accent,
           }}
         >
-          {movie.badge}
+          {item.badge}
         </span>
       )}
+
+      {/* Indicador de pelicula / serie */}
+      <span className="absolute right-2.5 top-2.5 z-30 rounded-sm bg-night/85 px-1.5 py-0.5 font-display text-[0.5rem] font-bold uppercase tracking-widest text-vellum/90">
+        {item.mediaType === 'tv' ? 'Serie' : 'Peli'}
+      </span>
 
       {/* Ficha inferior: titulo en oro claro y metadatos en vellum */}
       <div className="absolute inset-x-0 bottom-0 z-20 p-3">
         <h3 className="line-clamp-2 font-display text-[0.8rem] font-bold leading-tight text-gold-light drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)]">
-          {movie.title}
+          {item.title}
         </h3>
 
         <div className="mt-1.5 flex items-center justify-between gap-2 text-[0.62rem] text-vellum">
           <span className="flex items-center gap-1">
             <Star className="h-3 w-3 fill-gold text-gold" />
-            <span className="font-semibold text-gold-light">{movie.score.toFixed(1)}</span>
+            <span className="font-semibold text-gold-light">
+              {item.score.toFixed(1)}
+            </span>
           </span>
           <span className="tabular-nums text-vellum/85">
-            {movie.year} · {movie.rating}
+            {item.year > 0 ? item.year : '—'}
           </span>
         </div>
 
         {/* Acciones que se iluminan al revelar */}
-        <div className="mt-2 flex gap-1.5 opacity-0 transition-all duration-500 group-hover:opacity-100 group-focus-visible:opacity-100">
+        <div className="mt-2 flex items-center gap-1.5 opacity-0 transition-all duration-500 group-hover:opacity-100 group-focus-visible:opacity-100">
           <span className="flex flex-1 items-center justify-center gap-1 rounded bg-gold px-2 py-1.5 font-display text-[0.6rem] font-bold uppercase tracking-wider text-night">
             <Play className="h-3 w-3 fill-night" />
             Ver
           </span>
+
+          {/* Guardar en Mi Lista: detiene la propagacion para no abrir el modal. */}
           <span
-            className="flex items-center justify-center rounded border border-gold/70 bg-night/85 px-2.5 py-1.5 font-display text-[0.6rem] font-bold uppercase tracking-wider text-white"
-            title={'Ver información de ' + movie.title}
+            role="button"
+            tabIndex={-1}
+            onClick={(event) => {
+              event.stopPropagation()
+              onToggleSave(item)
+            }}
+            title={saved ? 'Quitar de Mi Lista' : 'Añadir a Mi Lista'}
+            aria-label={saved ? 'Quitar de Mi Lista' : 'Añadir a Mi Lista'}
+            className={
+              'flex cursor-pointer items-center justify-center rounded border px-2 py-1.5 transition-colors ' +
+              (saved
+                ? 'border-gold bg-gold text-night'
+                : 'border-gold/70 bg-night/85 text-white hover:bg-gold hover:text-night')
+            }
           >
-            <Eye className="h-3 w-3" />
+            {saved ? <Check className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+          </span>
+
+          <span
+            className="flex items-center justify-center rounded border border-gold/70 bg-night/85 px-2 py-1.5"
+            title={'Ver información de ' + item.title}
+          >
+            <Eye className="h-3 w-3 text-white" />
           </span>
         </div>
       </div>
@@ -168,11 +201,12 @@ function MovieCard({ movie, index, onSelect }: MovieCardProps) {
       {/* Borde inferior con el color de la casa */}
       <span
         className="absolute inset-x-0 bottom-0 z-30 h-0.5 opacity-0 transition-opacity duration-500 group-hover:opacity-100"
-        style={{ background: 'linear-gradient(90deg, transparent, ' + accent + ', transparent)' }}
+        style={{
+          background: 'linear-gradient(90deg, transparent, ' + accent + ', transparent)',
+        }}
         aria-hidden="true"
       />
-
-      </button>
+    </button>
   )
 }
 
