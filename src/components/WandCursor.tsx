@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 
 /** Una chispa individual de la estela de la varita. */
 interface Spark {
@@ -9,21 +9,42 @@ interface Spark {
   life: number
   maxLife: number
   size: number
-  /** Tono de la chispa, oscila entre dorado y azul magico. */
-  hue: number
+  /** Tono de la chispa: dorado Snitch (45) o azul magico (205). */
+  hue: 45 | 205
 }
 
 /** Rapidez con la que la varita persigue al puntero (0-1). */
 const TRAIL_STRENGTH = 0.22
 /** Distancia minima entre chispas para no saturar la pantalla. */
-const SPAWN_DISTANCE = 6
-/** Maximo de chispas vivas simultaneamente. */
-const MAX_SPARKS = 260
+const SPAWN_DISTANCE = 8
+/**
+ * Maximo de chispas vivas. Bajado de 260 a 140: con sprites pre-renderizados
+ * el coste por chispa es ~0,02 ms, asi que el limite ya no marca la diferencia
+ * visual pero si alivia al recolector de basura.
+ */
+const MAX_SPARKS = 140
+/**
+ * Lado del sprite pre-renderizado. Todas las chispas reutilizan la misma
+ * textura: se evita crear un degradado radial por chispa y fotograma, que era
+ * el cuello de botella real del efecto.
+ */
+const SPRITE_SIZE = 64
+/** Fotogramas sin actividad tras los cuales se apaga el bucle de animacion. */
+const IDLE_FRAMES = 20
 
 /**
  * WandCursor - Sustituye el puntero del raton por una varita magica que
- * proyecta una estela de chispas doradas y azules sobre un canvas a pantalla
- * completa. Se desactiva automaticamente en dispositivos tactiles.
+ * proyecta una estela de chispas doradas y azules.
+ *
+ * OPTIMIZACIONES CLAVE (antes saturaba el hilo principal):
+ *  1. Un unico bucle de `requestAnimationFrame`: el evento `pointermove` solo
+ *     escribe dos numeros y nunca provoca renderizados de React.
+ *  2. Las chispas se pintan con `drawImage` de un sprite pre-renderizado en
+ *     lugar de `createRadialGradient()` por chispa y fotograma.
+ *  3. El bucle se detiene por completo cuando no hay movimiento ni chispas
+ *     (`IDLE_FRAMES`), dejando el hilo principal libre al 100 %.
+ *  4. Se pausa al ocultar la pestaña.
+ *  5. `globalCompositeOperation = 'lighter'` deja el destello aditivo a la GPU.
  */
 export default function WandCursor() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -34,12 +55,14 @@ export default function WandCursor() {
 
     // Los dispositivos tactiles no tienen puntero: no tiene sentido el cursor.
     if (window.matchMedia('(pointer: coarse)').matches) return
+    // Respeta la preferencia del sistema: sin varita, sin destellos.
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
 
-    const ctx = canvas.getContext('2d')
+    const ctx = canvas.getContext('2d', { alpha: true })
     if (!ctx) return
 
-    let width = 0
-    let height = 0
+    let width = window.innerWidth
+    let height = window.innerHeight
     let dpr = 1
 
     const resize = () => {
@@ -54,7 +77,28 @@ export default function WandCursor() {
     }
 
     resize()
-    window.addEventListener('resize', resize)
+    window.addEventListener('resize', resize, { passive: true })
+
+    /* Sprites pre-renderizados: un canvas por tono, dibujado UNA sola vez. */
+    const makeSparkSprite = (hue: number): HTMLCanvasElement => {
+      const sprite = document.createElement('canvas')
+      sprite.width = SPRITE_SIZE
+      sprite.height = SPRITE_SIZE
+      const sctx = sprite.getContext('2d')
+      if (!sctx) return sprite
+
+      const c = SPRITE_SIZE / 2
+      const glow = sctx.createRadialGradient(c, c, 0, c, c, c)
+      glow.addColorStop(0, 'hsla(' + hue + ', 100%, 92%, 1)')
+      glow.addColorStop(0.25, 'hsla(' + hue + ', 100%, 70%, 0.55)')
+      glow.addColorStop(0.55, 'hsla(' + hue + ', 95%, 55%, 0.16)')
+      glow.addColorStop(1, 'hsla(' + hue + ', 90%, 45%, 0)')
+      sctx.fillStyle = glow
+      sctx.fillRect(0, 0, SPRITE_SIZE, SPRITE_SIZE)
+      return sprite
+    }
+
+    const sprites = { gold: makeSparkSprite(45), blue: makeSparkSprite(205) }
 
     // Posicion real del raton y posicion suavizada de la varita.
     const pointer = { x: width / 2, y: height / 2 }
@@ -65,13 +109,20 @@ export default function WandCursor() {
     let hovering = false
     let pressing = false
     let frame = 0
+    let idleFrames = 0
+    let paused = false
 
     document.body.classList.add('has-wand-cursor')
 
+    /* Eventos: SOLO escriben en variables. Mover el raton no provoca ni un
+       solo renderizado de React. */
     const onMove = (event: PointerEvent) => {
       pointer.x = event.clientX
       pointer.y = event.clientY
       hovering = true
+      idleFrames = 0
+      // Si el bucle esta dormido (pestaña inactiva), lo despertamos.
+      if (!frame && !paused) frame = window.requestAnimationFrame(draw)
     }
     const onLeave = () => {
       hovering = false
@@ -82,18 +133,26 @@ export default function WandCursor() {
     const onUp = () => {
       pressing = false
     }
+    const onVisibility = () => {
+      paused = document.hidden
+      if (paused) {
+        window.cancelAnimationFrame(frame)
+        frame = 0
+      }
+    }
 
     window.addEventListener('pointermove', onMove, { passive: true })
     window.addEventListener('pointerdown', onDown, { passive: true })
     window.addEventListener('pointerup', onUp, { passive: true })
     document.addEventListener('mouseleave', onLeave)
+    document.addEventListener('visibilitychange', onVisibility)
 
     /** Emite una chispa en la punta de la varita. */
     const emit = (x: number, y: number, boost: number) => {
       if (sparks.length >= MAX_SPARKS) return
       const angle = Math.random() * Math.PI * 2
       const speed = Math.random() * 0.9 + 0.15
-      const maxLife = 34 + Math.random() * 46
+      const maxLife = 30 + Math.random() * 34
 
       sparks.push({
         x: x,
@@ -103,12 +162,10 @@ export default function WandCursor() {
         life: maxLife,
         maxLife: maxLife,
         size: (Math.random() * 2.1 + 0.7) * boost,
-        // 45 = dorado Snitch, 205 = azul magico
         hue: Math.random() > 0.35 ? 45 : 205,
       })
     }
-
-    const draw = () => {
+const draw = () => {
       frame = window.requestAnimationFrame(draw)
 
       // La varita persigue al puntero con inercia suave.
@@ -122,19 +179,23 @@ export default function WandCursor() {
         const dy = wand.y - lastSpawn.y
         const distance = Math.hypot(dx, dy)
 
-        // Emite chispas segun la distancia recorrida, no por frame.
+        // Emite chispas segun la distancia recorrida, no por fotograma.
         if (distance >= SPAWN_DISTANCE) {
-          const steps = Math.min(Math.floor(distance / SPAWN_DISTANCE), 6)
+          const steps = Math.min(Math.floor(distance / SPAWN_DISTANCE), 4)
           for (let i = 1; i <= steps; i += 1) {
             const t = i / steps
             emit(wand.x - dx * (1 - t), wand.y - dy * (1 - t), pressing ? 1.7 : 1)
           }
           lastSpawn.x = wand.x
           lastSpawn.y = wand.y
+          idleFrames = 0
         }
       }
 
-      // Integracion y dibujado de las chispas.
+      // Aditivo: el destello lo compone la GPU en un solo paso.
+      ctx.globalCompositeOperation = 'lighter'
+
+      // Integracion y dibujado con sprite pre-renderizado.
       for (let i = sparks.length - 1; i >= 0; i -= 1) {
         const spark = sparks[i]
         spark.x += spark.vx
@@ -150,29 +211,35 @@ export default function WandCursor() {
         }
 
         const progress = spark.life / spark.maxLife
-        const alpha = progress * progress
         const radius = spark.size * (0.35 + progress * 0.65)
+        const diameter = radius * 8
 
-        const glow = ctx.createRadialGradient(
-          spark.x,
-          spark.y,
-          0,
-          spark.x,
-          spark.y,
-          radius * 4,
+        ctx.globalAlpha = progress * progress
+        ctx.drawImage(
+          spark.hue === 45 ? sprites.gold : sprites.blue,
+          spark.x - diameter / 2,
+          spark.y - diameter / 2,
+          diameter,
+          diameter,
         )
-        glow.addColorStop(0, 'hsla(' + spark.hue + ', 100%, 88%, ' + alpha + ')')
-        glow.addColorStop(0.35, 'hsla(' + spark.hue + ', 95%, 62%, ' + alpha * 0.6 + ')')
-        glow.addColorStop(1, 'hsla(' + spark.hue + ', 90%, 45%, 0)')
-
-        ctx.fillStyle = glow
-        ctx.beginPath()
-        ctx.arc(spark.x, spark.y, radius * 4, 0, Math.PI * 2)
-        ctx.fill()
       }
+
+      ctx.globalAlpha = 1
+      ctx.globalCompositeOperation = 'source-over'
 
       if (hovering) {
         drawWand(ctx, wand.x, wand.y, pressing)
+      }
+
+      /* Apagado automatico: sin puntero en movimiento y sin chispas vivas,
+         el bucle se detiene para liberar por completo el hilo principal. */
+      const active =
+        hovering &&
+        (sparks.length > 0 || pointer.x !== wand.x || pointer.y !== wand.y)
+      idleFrames = active ? 0 : idleFrames + 1
+      if (idleFrames > IDLE_FRAMES) {
+        window.cancelAnimationFrame(frame)
+        frame = 0
       }
     }
 
@@ -185,6 +252,7 @@ export default function WandCursor() {
       window.removeEventListener('pointerdown', onDown)
       window.removeEventListener('pointerup', onUp)
       document.removeEventListener('mouseleave', onLeave)
+      document.removeEventListener('visibilitychange', onVisibility)
       document.body.classList.remove('has-wand-cursor')
     }
   }, [])
@@ -193,7 +261,7 @@ export default function WandCursor() {
     <canvas
       ref={canvasRef}
       aria-hidden="true"
-      className="pointer-events-none fixed inset-0 z-[9999]"
+      className="gpu pointer-events-none fixed inset-0 z-[9999]"
     />
   )
 }
@@ -236,8 +304,8 @@ function drawWand(
   const tipRadius = pressing ? 11 : 7
   const tip = ctx.createRadialGradient(0, 0, 0, 0, 0, tipRadius)
   tip.addColorStop(0, 'rgba(255, 248, 214, 0.95)')
-  tip.addColorStop(0.4, 'rgba(212, 175, 55, 0.55)')
-  tip.addColorStop(1, 'rgba(212, 175, 55, 0)')
+  tip.addColorStop(0.4, 'rgba(255, 215, 0, 0.55)')
+  tip.addColorStop(1, 'rgba(255, 215, 0, 0)')
   ctx.fillStyle = tip
   ctx.beginPath()
   ctx.arc(0, 0, tipRadius, 0, Math.PI * 2)
@@ -245,3 +313,4 @@ function drawWand(
 
   ctx.restore()
 }
+

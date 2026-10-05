@@ -1,5 +1,4 @@
-﻿import { useCallback, useEffect, useRef, useState } from 'react'
-import { motion } from 'framer-motion'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import type { Category, Movie } from '../types'
 import MovieCard from './MovieCard'
@@ -18,13 +17,21 @@ const GAP = 14
 /**
  * CategoryRow - Fila horizontal de peliculas con scroll fluido, flechas
  * doradas en escritorio y soporte swipe en moviles.
+ *
+ * OPTIMIZACION: `syncArrows` se agrupa por fotograma con `requestAnimationFrame`.
+ * Antes, cada evento `scroll` (que puede dispararse 60 veces por segundo)
+ * llamaba a `setState` de forma directa, provocando renders innecesarios.
+ * Ademas se usa IntersectionObserver en vez de animaciones de framer-motion por
+ * fila, que registraban un observador por seccion.
  */
-export default function CategoryRow({ category, movies, onSelect }: CategoryRowProps) {
+function CategoryRow({ category, movies, onSelect }: CategoryRowProps) {
   const trackRef = useRef<HTMLDivElement | null>(null)
+  const sectionRef = useRef<HTMLElement | null>(null)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(false)
+  const [visible, setVisible] = useState(false)
 
-  /** Sincroniza la visibilidad de las flechas con la posicion del scroll. */
+  /** Sincroniza la visibilidad de las flechas, una vez por fotograma. */
   const syncArrows = useCallback(() => {
     const track = trackRef.current
     if (!track) return
@@ -38,15 +45,45 @@ export default function CategoryRow({ category, movies, onSelect }: CategoryRowP
     const track = trackRef.current
     if (!track) return
 
-    track.addEventListener('scroll', syncArrows, { passive: true })
-    window.addEventListener('resize', syncArrows)
+    let raf = 0
+    const onScroll = () => {
+      // Se anota el trabajo y se ejecuta una sola vez por fotograma.
+      if (raf) return
+      raf = window.requestAnimationFrame(() => {
+        raf = 0
+        syncArrows()
+      })
+    }
+
+    track.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('resize', onScroll, { passive: true })
     return () => {
-      track.removeEventListener('scroll', syncArrows)
-      window.removeEventListener('resize', syncArrows)
+      if (raf) window.cancelAnimationFrame(raf)
+      track.removeEventListener('scroll', onScroll)
+      window.removeEventListener('resize', onScroll)
     }
   }, [syncArrows, movies.length])
 
-  /** Desplaza la fila una tarjeta completa hacia el lado indicado. */
+  // Revela la fila una sola vez al entrar en pantalla.
+  useEffect(() => {
+    const node = sectionRef.current
+    if (!node) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            setVisible(true)
+            observer.disconnect()
+          }
+        }
+      },
+      { rootMargin: '80px' },
+    )
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [])
+
+  /** Desplaza la fila dos tarjetas hacia el lado indicado. */
   const scrollByCards = (direction: 1 | -1) => {
     const track = trackRef.current
     if (!track) return
@@ -59,22 +96,25 @@ export default function CategoryRow({ category, movies, onSelect }: CategoryRowP
   if (movies.length === 0) return null
 
   return (
-    <motion.section
+    <section
+      ref={sectionRef}
       id={category.id}
-      initial={{ opacity: 0, y: 36 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: '-80px' }}
-      transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
-      className="group/row relative mb-14 scroll-mt-28"
+      className="group/row relative mb-14 scroll-mt-28 transition-opacity duration-700"
+      style={{
+        opacity: visible ? 1 : 0,
+        transform: visible ? 'none' : 'translate3d(0, 28px, 0)',
+      }}
     >
-      {/* Encabezado de la fila */}
+{/* Encabezado de la fila */}
       <div className="mb-4 flex items-end justify-between gap-4 px-4 sm:px-8 lg:px-12">
         <div>
           <h2 className="glow-effect flex items-center gap-2.5 font-display text-xl font-bold sm:text-2xl">
             <span aria-hidden="true">{category.icon}</span>
             {category.title}
           </h2>
-          <p className="mt-1 text-xs text-parchment/45 sm:text-sm">{category.description}</p>
+          <p className="mt-1 text-xs font-medium text-vellum/80 sm:text-sm">
+            {category.description}
+          </p>
         </div>
 
         {/* Flechas doradas (solo escritorio) */}
@@ -85,10 +125,10 @@ export default function CategoryRow({ category, movies, onSelect }: CategoryRowP
             disabled={!canScrollLeft}
             aria-label={'Ver anterior en ' + category.title}
             className={
-              'flex h-9 w-9 items-center justify-center rounded-full border border-gold/40 text-gold transition-all duration-300 ' +
+              'flex h-9 w-9 items-center justify-center rounded-full border-2 transition-all duration-300 ' +
               (canScrollLeft
-                ? 'bg-gold/10 opacity-100 hover:bg-gold hover:text-night'
-                : 'cursor-not-allowed border-parchment/15 text-parchment/20 opacity-40')
+                ? 'border-gold bg-gold/15 text-gold-light hover:bg-gold hover:text-night'
+                : 'cursor-not-allowed border-gold/20 text-vellum/30')
             }
           >
             <ChevronLeft className="h-5 w-5" />
@@ -99,10 +139,10 @@ export default function CategoryRow({ category, movies, onSelect }: CategoryRowP
             disabled={!canScrollRight}
             aria-label={'Ver siguiente en ' + category.title}
             className={
-              'flex h-9 w-9 items-center justify-center rounded-full border border-gold/40 text-gold transition-all duration-300 ' +
+              'flex h-9 w-9 items-center justify-center rounded-full border-2 transition-all duration-300 ' +
               (canScrollRight
-                ? 'bg-gold/10 opacity-100 hover:bg-gold hover:text-night'
-                : 'cursor-not-allowed border-parchment/15 text-parchment/20 opacity-40')
+                ? 'border-gold bg-gold/15 text-gold-light hover:bg-gold hover:text-night'
+                : 'cursor-not-allowed border-gold/20 text-vellum/30')
             }
           >
             <ChevronRight className="h-5 w-5" />
@@ -142,6 +182,8 @@ export default function CategoryRow({ category, movies, onSelect }: CategoryRowP
           ))}
         </div>
       </div>
-    </motion.section>
+    </section>
   )
 }
+
+export default memo(CategoryRow)

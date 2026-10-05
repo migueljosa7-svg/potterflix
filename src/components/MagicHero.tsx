@@ -1,8 +1,9 @@
-﻿import { useMemo } from 'react'
+import { memo, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { Info, Play, Star } from 'lucide-react'
 import type { Movie } from '../types'
-import { HOUSE_COLORS } from '../data/mockMovies'
+import { HOUSE_ACCENTS } from '../data/mockMovies'
+import { backdropFor } from '../data/filmArt'
 
 interface MagicHeroProps {
   movie: Movie
@@ -16,15 +17,20 @@ const formatDuration = (minutes: number) =>
 
 /**
  * MagicHero - Banner cinematico destacado con brasas flotantes, degradados
- * MAGICOS y los botones de hechizo Lumos (Ver Ahora) y Revelio (Informacion).
+ * magicos y los botones de hechizo Lumos (Ver Ahora) y Revelio (Informacion).
+ *
+ * CONTRASTE: titulos en oro claro y textos secundarios en vellum, ambos con
+ * sombra oscura. El boton secundario usa texto blanco bold sobre fondo
+ * translucido con borde dorado, nunca texto oscuro sobre fondo oscuro.
  */
-export default function MagicHero({ movie, onPlay, onInfo }: MagicHeroProps) {
-  const accent = HOUSE_COLORS[movie.house]
+function MagicHero({ movie, onPlay, onInfo }: MagicHeroProps) {
+  const accent = HOUSE_ACCENTS[movie.house]
+  const backdrop = backdropFor(movie)
 
   // Las brasas se generan una sola vez por pelicula para mantener la animacion fluida.
   const embers = useMemo(
     () =>
-      Array.from({ length: 26 }, (_, index) => ({
+      Array.from({ length: 22 }, (_, index) => ({
         id: index,
         left: Math.random() * 100,
         delay: Math.random() * 7,
@@ -40,24 +46,20 @@ export default function MagicHero({ movie, onPlay, onInfo }: MagicHeroProps) {
     <section className="relative h-[88vh] min-h-[560px] w-full overflow-hidden">
       {/* Fondo cinematico */}
       <motion.div
-        key={movie.backdrop}
-        initial={{ scale: 1.12, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ duration: 1.6, ease: [0.22, 1, 0.36, 1] }}
+        key={movie.id}
+        initial={{ opacity: 0, scale: 1.08 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 1.4, ease: [0.22, 1, 0.36, 1] }}
         className="absolute inset-0"
       >
-        <img
-          src={movie.backdrop}
-          alt=""
-          className="h-full w-full object-cover"
-        />
+        <img src={backdrop} alt="" className="h-full w-full object-cover" />
       </motion.div>
 
       {/* Velo de Sombras de Hogwarts */}
-      <div className="absolute inset-0 bg-gradient-to-r from-night via-night/80 to-night/25" />
+      <div className="absolute inset-0 bg-gradient-to-r from-night via-night/85 to-night/35" />
       <div className="absolute inset-0 bg-gradient-to-t from-night via-transparent to-night/60" />
       <div
-        className="absolute inset-0 opacity-40 mix-blend-soft-light"
+        className="absolute inset-0 opacity-50"
         style={{ background: 'radial-gradient(circle at 30% 40%, ' + accent + '55, transparent 60%)' }}
       />
 
@@ -75,66 +77,70 @@ export default function MagicHero({ movie, onPlay, onInfo }: MagicHeroProps) {
                 animationDelay: ember.delay + 's',
                 animationDuration: ember.duration + 's',
                 '--drift': ember.drift + 'px',
-                background: ember.gold ? '#f3d97b' : '#8ab4f8',
-                boxShadow: '0 0 8px 2px ' + (ember.gold ? 'rgba(243,217,123,0.75)' : 'rgba(138,180,248,0.6)'),
+                background: ember.gold ? '#fff3c4' : '#a9c8ff',
+                boxShadow: '0 0 8px 2px ' + (ember.gold ? 'rgba(255,243,196,0.75)' : 'rgba(169,200,255,0.6)'),
               } as React.CSSProperties
             }
           />
         ))}
       </div>
-
-      {/* Contenido */}
+{/* Contenido */}
       <div className="relative z-10 mx-auto flex h-full max-w-[1600px] flex-col justify-end px-4 pb-24 sm:px-8 lg:pb-32">
         <motion.div
-          initial={{ opacity: 0, y: 44 }}
+          initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.9, delay: 0.25, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ duration: 0.85, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
           className="max-w-2xl"
         >
           {/* Distintivo de la casa */}
           <span
-            className="mb-4 inline-flex items-center gap-2 rounded-full border px-3 py-1 font-display text-[0.6rem] uppercase tracking-[0.28em]"
-            style={{ borderColor: accent + '88', color: accent, background: accent + '14' }}
+            className="mb-4 inline-flex items-center gap-2 rounded-full border px-3 py-1 font-display text-[0.6rem] font-bold uppercase tracking-[0.28em]"
+            style={{
+              borderColor: accent + '99',
+              color: accent,
+              background: 'rgba(8,9,15,0.75)',
+            }}
           >
             <span className="h-1.5 w-1.5 rounded-full" style={{ background: accent }} />
             Destacado del Pensadero
           </span>
 
-          <h1 className="glow-effect font-display text-4xl font-bold leading-[1.05] sm:text-6xl lg:text-7xl">
+          {/* Titulo en oro brillante con drop-shadow */}
+          <h1 className="glow-effect font-display text-4xl font-black leading-[1.05] sm:text-6xl lg:text-7xl">
             {movie.title}
           </h1>
 
-          <p className="mt-3 font-display text-sm italic text-gold/80 sm:text-base">
+          <p className="mt-3 font-display text-sm italic text-gold/90 sm:text-base">
             {movie.tagline}
           </p>
 
-          {/* Metadatos */}
-          <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-parchment/70">
+          {/* Metadatos en vellum claro */}
+          <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-medium text-vellum">
             <span className="flex items-center gap-1.5">
               <Star className="h-4 w-4 fill-gold text-gold" />
-              <span className="font-semibold text-gold-light">{movie.score.toFixed(1)}</span>
+              <span className="font-bold text-gold-light">{movie.score.toFixed(1)}</span>
               <span className="hidden sm:inline">Galeones de Oro</span>
             </span>
             <span className="tabular-nums">{movie.year}</span>
-            <span className="rounded border border-parchment/25 px-1.5 py-0.5">
+            <span className="rounded border border-gold/45 px-1.5 py-0.5 font-semibold">
               {movie.rating}
             </span>
             <span className="tabular-nums">{formatDuration(movie.durationMinutes)}</span>
-            {movie.seasons && <span>{movie.seasons} temporadas</span>}
           </div>
 
-          <p className="mt-5 max-w-xl text-sm leading-relaxed text-parchment/60 sm:text-base">
+          {/* Sinopsis en blanco pergamino */}
+          <p className="mt-5 max-w-xl text-sm leading-relaxed text-vellum sm:text-base">
             {movie.synopsis}
           </p>
 
-          {/* Botones magicos */}
+          {/* Botones magicos de alto contraste */}
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <motion.button
               type="button"
               onClick={() => onPlay(movie)}
-              whileHover={{ scale: 1.06 }}
+              whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.96 }}
-              className="group relative flex items-center gap-2.5 overflow-hidden rounded-md bg-gold px-7 py-3 font-display text-sm font-bold uppercase tracking-wider text-night shadow-[0_0_30px_-6px_rgba(212,175,55,0.85)]"
+              className="group relative flex items-center gap-2.5 overflow-hidden rounded-md bg-gold px-7 py-3 font-display text-sm font-black uppercase tracking-wider text-night shadow-[0_0_30px_-6px_rgba(255,215,0,0.9)]"
             >
               {/* Barrido de luz del hechizo Lumos */}
               <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/55 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
@@ -145,9 +151,9 @@ export default function MagicHero({ movie, onPlay, onInfo }: MagicHeroProps) {
             <motion.button
               type="button"
               onClick={() => onInfo(movie)}
-              whileHover={{ scale: 1.06 }}
+              whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.96 }}
-              className="flex items-center gap-2.5 rounded-md border border-parchment/35 bg-night/55 px-7 py-3 font-display text-sm font-bold uppercase tracking-wider text-parchment backdrop-blur-sm transition-colors hover:border-gold/70 hover:text-gold"
+              className="flex items-center gap-2.5 rounded-md border-2 border-gold/80 bg-night/70 px-7 py-3 font-display text-sm font-bold uppercase tracking-wider text-white backdrop-blur-sm transition-colors hover:bg-gold hover:text-night"
             >
               <Info className="h-4 w-4" />
               Mas Informacion
@@ -161,3 +167,5 @@ export default function MagicHero({ movie, onPlay, onInfo }: MagicHeroProps) {
     </section>
   )
 }
+
+export default memo(MagicHero)

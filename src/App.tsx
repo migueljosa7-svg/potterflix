@@ -1,43 +1,102 @@
-﻿import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import CategoryRow from './components/CategoryRow'
+import FloatingCandles from './components/FloatingCandles'
 import MagicHero from './components/MagicHero'
 import MagicModal from './components/MagicModal'
 import Navbar from './components/Navbar'
 import WandCursor from './components/WandCursor'
-import { CATEGORIES, MOVIES } from './data/mockMovies'
-import type { Movie } from './types'
+import { CATEGORIES, HOUSE_AURAS, MOVIES } from './data/mockMovies'
+import type { CategoryId, House, Movie } from './types'
+
+/** Casa inicial y clave de almacenamiento de la preferencia del usuario. */
+const DEFAULT_HOUSE: House = 'gryffindor'
+const HOUSE_STORAGE_KEY = 'potterflix:house'
 
 /**
  * App - Catalogo PotterFlix: hero del Pensadero, filas tematicas con efecto
- * Revelio, cursor de varita y modal de detalle con trailer.
+ * Revelio, velas flotantes del Gran Comedor, cursor de varita optimizado y
+ * modal de detalle con trailer de YouTube.
+ *
+ * INTEGRACION OPTIMIZADA:
+ *  - Los peliculas por categoria se calculan UNA vez con `useMemo`; antes se
+ *    filtraba el array completo en cada render de cada fila.
+ *  - El conmutador de casas solo escribe un atributo `data-house` en el DOM, de
+ *    modo que cambiar el aura no vuelve a renderizar ninguna tarjeta.
+ *  - `MOVIES_BY_CATEGORY` mantiene referencias estables para que los `memo` de
+ *    CategoryRow y MovieCard puedan saltarse el renderizado.
  */
 export default function App() {
   const [selected, setSelected] = useState<Movie | null>(null)
-  const [activeCategory, setActiveCategory] = useState<string>(CATEGORIES[0].id)
+  const [activeCategory, setActiveCategory] = useState<CategoryId>(
+    CATEGORIES[0].id,
+  )
+  const [activeHouse, setActiveHouse] = useState<House>(DEFAULT_HOUSE)
 
-  /** El hero rota entre los hechizos destacados. */
-  const featured = useMemo(
-    () => MOVIES.filter((movie) => movie.featured),
+  /* Agrupacion estable por categoria: se calcula una sola vez. */
+  const moviesByCategory = useMemo(() => {
+    const map = new Map<CategoryId, Movie[]>()
+    for (const category of CATEGORIES) map.set(category.id, [])
+    for (const movie of MOVIES) {
+      const bucket = map.get(movie.category)
+      if (bucket) bucket.push(movie)
+    }
+    return map
+  }, [])
+
+  /* El hero rota entre los hechizos destacados. */
+  const heroMovie = useMemo(
+    () => MOVIES.find((movie) => movie.featured) ?? MOVIES[0],
     [],
   )
-  const heroMovie = featured[0] ?? MOVIES[0]
+
+  /* Restaura la casa elegida y refleja el aura en el atributo del <html>. */
+  useEffect(() => {
+    const stored = window.localStorage.getItem(HOUSE_STORAGE_KEY) as House | null
+    if (
+      stored &&
+      ['gryffindor', 'slytherin', 'ravenclaw', 'hufflepuff'].includes(stored)
+    ) {
+      setActiveHouse(stored)
+    }
+  }, [])
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-house', activeHouse)
+    document.documentElement.style.setProperty(
+      '--house-aura',
+      HOUSE_AURAS[activeHouse],
+    )
+    window.localStorage.setItem(HOUSE_STORAGE_KEY, activeHouse)
+  }, [activeHouse])
 
   const openModal = useCallback((movie: Movie) => setSelected(movie), [])
   const closeModal = useCallback(() => setSelected(null), [])
 
   /** Desplaza la pagina hasta la fila seleccionada desde el menu. */
-  const handleCategoryChange = useCallback((id: string) => {
+  const handleCategoryChange = useCallback((id: CategoryId) => {
     setActiveCategory(id)
     const node = document.getElementById(id)
     if (node) node.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }, [])
 
+  const handleHouseChange = useCallback((house: House) => {
+    setActiveHouse(house)
+  }, [])
+
   return (
-    <div className="min-h-screen bg-night text-parchment">
-      {/* Cursor de varita con estela de chispas */}
+    <div className="min-h-screen bg-night text-vellum">
+      {/* Fondo de velas flotantes del Gran Comedor */}
+      <FloatingCandles />
+
+      {/* Cursor de varita optimizado con sprites pre-renderizados */}
       <WandCursor />
 
-      <Navbar activeCategory={activeCategory} onCategoryChange={handleCategoryChange} />
+      <Navbar
+        activeCategory={activeCategory}
+        onCategoryChange={handleCategoryChange}
+        activeHouse={activeHouse}
+        onHouseChange={handleHouseChange}
+      />
 
       <main>
         {/* El Pensadero: banner cinematico */}
@@ -49,7 +108,7 @@ export default function App() {
             <CategoryRow
               key={category.id}
               category={category}
-              movies={MOVIES.filter((movie) => movie.category === category.id)}
+              movies={moviesByCategory.get(category.id) ?? []}
               onSelect={openModal}
             />
           ))}
@@ -57,13 +116,14 @@ export default function App() {
       </main>
 
       {/* Pie magico */}
-      <footer className="border-t border-gold/15 bg-parchment/40 py-10">
+      <footer className="relative z-10 border-t border-gold/20 bg-night/80 py-10">
         <div className="mx-auto max-w-[1600px] px-4 text-center sm:px-8">
-          <p className="font-display text-sm uppercase tracking-[0.3em] text-gold/70">
+          <p className="font-display text-sm font-bold uppercase tracking-[0.3em] text-gold">
             PotterFlix
           </p>
-          <p className="mt-2 text-xs text-parchment/40">
-            Mixame con cuidado. Este Catalogo es solo una broma, no un hechizo real.
+          <p className="mt-2 text-xs font-medium text-vellum/75">
+            Proyecto fan no oficial. Los pósters se generan por código y los
+            tráileres pertenecen a sus respectivos titulares.
           </p>
         </div>
       </footer>
