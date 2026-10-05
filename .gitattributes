@@ -1,0 +1,5 @@
+# Normaliza finales de linea entre Windows (local) y Linux (Render/CI).
+* text=auto eol=lf
+
+# Los lockfiles nunca se normalizan.
+package-lock.json -diff

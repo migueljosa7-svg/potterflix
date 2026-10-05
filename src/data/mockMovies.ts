@@ -1,0 +1,426 @@
+import type { Category, House, HouseMeta, Movie } from '../types'
+
+/** Definicion visual de cada casa de Hogwarts. */
+export const HOUSES: HouseMeta[] = [
+  { id: 'gryffindor', name: 'Gryffindor', motto: 'Coraje y gloria', color: '#740001' },
+  { id: 'slytherin', name: 'Slytherin', motto: 'Ambicion y astucia', color: '#1a472a' },
+  { id: 'ravenclaw', name: 'Ravenclaw', motto: 'Ingenio y sabiduria', color: '#0e1a40' },
+  { id: 'hufflepuff', name: 'Hufflepuff', motto: 'Lealtad y paciencia', color: '#d4af37' },
+]
+
+/** Color de acento por casa, usado en bordes, titulos y destellos. */
+export const HOUSE_COLORS: Record<House, string> = {
+  gryffindor: '#c0392b',
+  slytherin: '#2ecc71',
+  ravenclaw: '#5b8def',
+  hufflepuff: '#d4af37',
+}
+
+/** Las cuatro categorias estilizadas del catalogo. */
+export const CATEGORIES: Category[] = [
+  {
+    id: 'dark-arts',
+    icon: '🐍',
+    title: 'Artes Oscuras & Misterio',
+    description: 'Hechizos prohibidos, artefactos malditos y secretos de la identidad.',
+    accent: '#1a472a',
+    priority: true,
+  },
+  {
+    id: 'charms-adventure',
+    icon: '🧹',
+    title: 'Encantamientos & Aventura',
+    description: 'Varitas en llamas, quaffles imposibles y viajes por el castillo.',
+    accent: '#d4af37',
+    priority: true,
+  },
+  {
+    id: 'love-potions',
+    icon: '🧪',
+    title: 'Pociones de Amor',
+    description: 'Filtros de amor y comedia magica en las mazmorras.',
+    accent: '#740001',
+  },
+  {
+    id: 'time-turners',
+    icon: '⏳',
+    title: 'Girotiempos',
+    description: 'A traves del tiempo, la musica y la memoria.',
+    accent: '#0e1a40',
+  },
+]
+
+/** Imagenes de respaldo generadas en caliente, sin dependencias externas. */
+const BACKDROP = (seed: string) => `https://picsum.photos/seed/${seed}/1280/720`
+const POSTER = (seed: string) => `https://picsum.photos/seed/${seed}/600/900`
+
+/** Catalogo de prueba: hechizos repartidos en 4 categorias. */
+export const MOVIES: Movie[] = [
+  {
+    id: 'half-blood-prince',
+    title: 'El Principio de Sangre Mixta',
+    tagline: 'La memoria es un tunel que se puede abrir con cuidado.',
+    synopsis:
+      'Albus Dumbledore aparece en los suenos revelando un pasado que cambia el curso de la guerra. Un secreto oscuro vuelve al castillo y el misterio se intensifica en el Salon de los Menesteres.',
+    year: 2025,
+    rating: 'PG-13',
+    durationMinutes: 152,
+    score: 9.4,
+    house: 'gryffindor',
+    category: 'charms-adventure',
+    genres: ['Aventura', 'Misterio', 'Magia'],
+    cast: [
+      { name: 'Dumbledore', character: 'El Archimago' },
+      { name: 'Severus Snape', character: 'El Master de Pociones' },
+      { name: 'Albus Potter', character: 'El Estudiante' },
+    ],
+    backdrop: BACKDROP('half-blood'),
+    poster: POSTER('half-blood'),
+    trailerId: 'dQw4w9WgXcQ',
+    featured: true,
+    badge: 'DESTACADO',
+  },
+  {
+    id: 'orden-del-fenix-oscuro',
+    title: 'Orden del Fenix Oscuro',
+    tagline: 'La hermandad que nunca debio renacer.',
+    synopsis:
+      'Una sociedad secreta resurge bajo las gradas de Hogwarts mientras el Ministerio negocia con fuerzas antiguas. Thriller magico sobre lealtad, traicion y el precio de la sangre.',
+    year: 2025,
+    rating: 'R',
+    durationMinutes: 138,
+    score: 8.8,
+    house: 'slytherin',
+    category: 'dark-arts',
+    genres: ['Thriller', 'Artes Oscuras', 'Conspiracion'],
+    cast: [
+      { name: 'Minerva McGonagall', character: 'La Decana' },
+      { name: 'Regulus Black', character: 'El Mascaron' },
+      { name: 'Nymphadora Tonks', character: 'Aurora del Ministerio' },
+    ],
+    backdrop: BACKDROP('phoenix-order'),
+    poster: POSTER('phoenix-order'),
+    trailerId: 'aqz-KE-bpKQ',
+  },
+  {
+    id: 'vampiros-de-argos',
+    title: 'Los Vampiros de Argos',
+    tagline: 'No todos los que beben de ti son humanos.',
+    synopsis:
+      'Un pueblo muggle amanece sin sombra y con la mirada perdida. Una cazadora y un inspector investigan mientras la niebla cubre los tejados.',
+    year: 2024,
+    rating: 'PG-13',
+    durationMinutes: 126,
+    score: 8.1,
+    house: 'ravenclaw',
+    category: 'dark-arts',
+    genres: ['Terror', 'Misterio', 'Nocturno'],
+    cast: [
+      { name: 'Fay Dinemagic', character: 'La Investigadora' },
+      { name: 'Carlton Fading', character: 'El Cazador' },
+      { name: 'Mafalda Hopkirk', character: 'La Bronce Dorada' },
+    ],
+    backdrop: BACKDROP('argos-vampires'),
+    poster: POSTER('argos-vampires'),
+    trailerId: '1La4QzGeaaQ',
+  },
+  {
+    id: 'camarada-secreto',
+    title: 'El Camarada Secreto',
+    tagline: 'Una amistad prohibida bajo las escaleras.',
+    synopsis:
+      'Bajo la septima planta del castillo, Slytherin y Ravenclaw comparten un pasadizo secreto. Entrecepas robadas y juramentos rotos nace un romance en la oscuridad.',
+    year: 2024,
+    rating: 'PG-13',
+    durationMinutes: 118,
+    score: 7.6,
+    house: 'slytherin',
+    category: 'love-potions',
+    genres: ['Romance', 'Drama', 'Amistad'],
+    cast: [
+      { name: 'Draco Renfrew', character: 'El Sangre Puro' },
+      { name: 'Padma Patil', character: 'La Estrella Ravenclaw' },
+      { name: 'Fred Hollow', character: 'El Gemelo' },
+    ],
+    backdrop: BACKDROP('secret-room'),
+    poster: POSTER('secret-room'),
+    trailerId: '5qap5aO4i9A',
+  },
+  {
+    id: 'mazmorra-perdida',
+    title: 'La Mazmorra Perdida',
+    tagline: 'Baja. Nunca. Mas. Abajo.',
+    synopsis:
+      'Un laberinto subterranean cambia de posicion cada vez que alguien parpadea. Tres estudiantes atrapados deben resolver un acertijo milenario para salir con vida.',
+    year: 2025,
+    rating: 'Spell-III',
+    durationMinutes: 109,
+    score: 8.9,
+    house: 'hufflepuff',
+    category: 'charms-adventure',
+    genres: ['Aventura', 'Laberinto', 'Terror Leve'],
+    cast: [
+      { name: 'Ernie Macmillan', character: 'El Explorador' },
+      { name: 'Hannah Abbott', character: 'La Sanadora' },
+      { name: 'Zac Melford', character: 'El Forcejeo' },
+    ],
+    backdrop: BACKDROP('lost-maze'),
+    poster: POSTER('lost-maze'),
+    trailerId: '2Vv-BfVoq4g',
+    badge: 'NUEVO',
+  },
+  {
+    id: 'filtro-de-amor',
+    title: 'El Ultimo Filtro de Amor',
+    tagline: 'Un poco de iris, un toque de verdad.',
+    synopsis:
+      'El filtro de amor de una Beetlestone cae en manos equivocadas y la Escuela de Magia se convierte en un circo de corazones rotos. Comedia romantica con pociones improvisadas.',
+    year: 2023,
+    rating: 'PG',
+    durationMinutes: 97,
+    score: 7.1,
+    house: 'hufflepuff',
+    category: 'love-potions',
+    genres: ['Comedia', 'Romance', 'Pociones'],
+    cast: [
+      { name: 'Romilda Vane', character: 'La Apoteca' },
+      { name: 'Dunstan Thickett', character: 'El Arrepentido' },
+      { name: 'Agatha Cakemin', character: 'La Instructora' },
+    ],
+    backdrop: BACKDROP('love-potion'),
+    poster: POSTER('love-potion'),
+    trailerId: 'JGW5wZ1t0U0',
+  },
+  {
+    id: 'girotiempos-zona-horaria',
+    title: 'Girotiempos: La Zona Horaria',
+    tagline: 'Un siglo en un latido del corazon.',
+    synopsis:
+      'Un artefacto del Museo de Historia Magica abre un portal hacia la hora de comer de un martes de 1992. Lo que regresa es una version distinta de todos.',
+    year: 2025,
+    rating: 'PG-13',
+    durationMinutes: 131,
+    score: 9.0,
+    house: 'ravenclaw',
+    category: 'time-turners',
+    genres: ['Ciencia Ficcion', 'Viajes en el Tiempo', 'Misterio'],
+    cast: [
+      { name: 'Hermione Granger', character: 'La Estudiante' },
+      { name: 'Muggle Nerd', character: 'El Turista' },
+      { name: 'Rita Skeeter', character: 'La Cronista' },
+    ],
+    backdrop: BACKDROP('time-zone'),
+    poster: POSTER('time-zone'),
+    trailerId: 'pOkpizG8Zcuc',
+    featured: true,
+  },
+  {
+    id: 'ultimo-quidditch-final',
+    title: 'El Ultimo Quidditch Final',
+    tagline: 'La Snitch no perdona a los suecos.',
+    synopsis:
+      'La Copa de Quidditch se decide en la mano de un cazador invocando un hechizo fuera de norma. Deportes, magia y el rugir de las gradas.',
+    year: 2024,
+    rating: 'PG',
+    durationMinutes: 115,
+    score: 7.8,
+    house: 'gryffindor',
+    category: 'charms-adventure',
+    genres: ['Deportes', 'Aventura', 'Comedia'],
+    cast: [
+      { name: 'Oliver Wood', character: 'El Capitan' },
+      { name: 'Summer Glider', character: 'La Buscadora' },
+      { name: 'Slytherin Squealer', character: 'El Rival' },
+    ],
+    backdrop: BACKDROP('quidditch'),
+    poster: POSTER('quidditch'),
+    trailerId: '9bZkp7q19f0',
+  },
+
+  {
+    id: 'dama-dorada',
+    title: 'Dentro de la Dama Dorada',
+    tagline: 'La pintura no siempre mira sin sentir.',
+    synopsis:
+      'Una exploradora se desliza dentro de un retrato de Hogwarts y descubre que la Dama Dorada lleva 900 anos guardando un secreto sobre la fundacion de la escuela.',
+    year: 2023,
+    rating: 'PG-13',
+    durationMinutes: 101,
+    score: 7.4,
+    house: 'ravenclaw',
+    category: 'dark-arts',
+    genres: ['Misterio', 'Sobrenatural', 'Suspense'],
+    cast: [
+      { name: 'Marianne Routledge', character: 'La Exploradora' },
+      { name: 'La Dama Dorada', character: 'Ella Misma' },
+      { name: 'Melifluo', character: 'El Guardian' },
+    ],
+    backdrop: BACKDROP('golden-lady'),
+    poster: POSTER('golden-lady'),
+    trailerId: 'e-ORhEE9_2s',
+  },
+  {
+    id: 'baile-del-valle',
+    title: 'El Baile del Valle',
+    tagline: 'Encantamientos de apareamiento y secretos de turno.',
+    synopsis:
+      'El baile de fin de ano se acerca. Entre la musica encantada, dos estudiantes descubren que la duracion del baile depende de un hechizo mal jugado.',
+    year: 2024,
+    rating: 'PG',
+    durationMinutes: 94,
+    score: 6.9,
+    house: 'gryffindor',
+    category: 'love-potions',
+    genres: ['Romance', 'Musica', 'Comedia Ligera'],
+    cast: [
+      { name: 'Ginevra Mollet', character: 'La Estrella' },
+      { name: 'Diego Quick', character: 'El Bailarin' },
+      { name: 'Sra. Bulstroemugle', character: 'La Prefecta' },
+    ],
+    backdrop: BACKDROP('valley-dance'),
+    poster: POSTER('valley-dance'),
+    trailerId: 'nfWlot6h_JM',
+  },
+  {
+    id: 'alba-de-dragones',
+    title: 'Alba de Dragones',
+    tagline: 'Los dragones tampoco se subestiman.',
+    synopsis:
+      'La tarea de Proteccion de criaturas se complica cuando un dragon de Alba escapa. Una aventura de supervivencia en las Tierras Altas de Scotland.',
+    year: 2025,
+    rating: 'PG-13',
+    durationMinutes: 124,
+    score: 8.6,
+    house: 'hufflepuff',
+    category: 'charms-adventure',
+    genres: ['Fantasia', 'Aventura', 'Criaturas'],
+    cast: [
+      { name: 'Hagrid Salto Largo', character: 'El Guardabosques' },
+      { name: 'Daphne Greengrass', character: 'La Montacargas' },
+      { name: 'Victoire Vallet', character: 'La Exploradora' },
+    ],
+    backdrop: BACKDROP('dragon-dawn'),
+    poster: POSTER('dragon-dawn'),
+    trailerId: 's0fYBQkX1L0',
+  },
+  {
+    id: 'pasillo-oscuro',
+    title: 'El Pasillo Oscuro',
+    tagline: 'Las paredes escuchan. No susurres.',
+    synopsis:
+      'Un pasadizo secreto aparece en la Ala Norte y trae una habitacion que cambia de clasificacion. Thriller paranoico sobre vigilancia en los tuneles de Hogwarts.',
+    year: 2023,
+    rating: 'R',
+    durationMinutes: 108,
+    score: 8.3,
+    house: 'slytherin',
+    category: 'dark-arts',
+    genres: ['Terror', 'Paranoia', 'Misterio'],
+    cast: [
+      { name: 'Filius Flitwick', character: 'El Decano' },
+      { name: 'Millicent Bulstrode', character: 'La Sospechosa' },
+      { name: 'Ignatius Prewett', character: 'El Investigador' },
+    ],
+    backdrop: BACKDROP('dark-hallway'),
+    poster: POSTER('dark-hallway'),
+    trailerId: 'V1eD7mZ0Z3s',
+  },
+
+  {
+    id: 'cofre-magico',
+    title: 'El Cofre Magico',
+    tagline: 'Ciento doce llaves, ningun mapa.',
+    synopsis:
+      'Un cofre con cerradura de doce teclas y sin pistas lleva a cuatro amigos a los tuneles de la Brujeria, donde cada llave abre una sala que no deberia existir.',
+    year: 2024,
+    rating: 'PG-13',
+    durationMinutes: 112,
+    score: 7.9,
+    house: 'hufflepuff',
+    category: 'charms-adventure',
+    genres: ['Aventura', 'Enigma', 'Amistad'],
+    cast: [
+      { name: 'Justin Finch-Fletchley', character: 'El Amigo' },
+      { name: 'Lavender Brown', character: 'La Planeadora' },
+      { name: 'Ernie Macmillan', character: 'El Explorador' },
+    ],
+    backdrop: BACKDROP('magic-chest'),
+    poster: POSTER('magic-chest'),
+    trailerId: '1n7sJBLMZ3I',
+  },
+  {
+    id: 'leccion-de-pociones',
+    title: 'La Leccion de Pociones',
+    tagline: 'La Lockheed escarlata nunca se toca a la ligera.',
+    synopsis:
+      'En clase de Pociones un alumno crea un experimento que se rebela. Comedia de escuela con retoques de witty y listos de Amortiguadores.',
+    year: 2023,
+    rating: 'PG',
+    durationMinutes: 88,
+    score: 6.6,
+    house: 'gryffindor',
+    category: 'love-potions',
+    genres: ['Comedia', 'Escuela', 'Pociones'],
+    cast: [
+      { name: 'Rupert Fleamont', character: 'El Alumno' },
+      { name: 'Alanna Swift', character: 'La Companera' },
+      { name: 'Horace Slughorn', character: 'El Master' },
+    ],
+    backdrop: BACKDROP('potions-class'),
+    poster: POSTER('potions-class'),
+    trailerId: 'kJQP7kiw5Fk',
+  },
+  {
+    id: 'grito-en-el-templo',
+    title: 'El Grito en el Templo',
+    tagline: 'Cien mil galones, ni una gota de calma.',
+    synopsis:
+      'Un templo construido sobre un lago antiguo emerge cuando una marea revela una escritura perdida. Misterio arqueologico magico con mucha accion.',
+    year: 2024,
+    rating: 'PG-13',
+    durationMinutes: 117,
+    score: 8.0,
+    house: 'ravenclaw',
+    category: 'time-turners',
+    genres: ['Misterio', 'Aventura', 'Arqueologia'],
+    cast: [
+      { name: 'Norbert Dragonridge', character: 'El Investigador' },
+      { name: 'Chandler Wraysford', character: 'La Rapsoda' },
+      { name: 'Fawkes', character: 'El Fenix' },
+    ],
+    backdrop: BACKDROP('temple-scream'),
+    poster: POSTER('temple-scream'),
+    trailerId: '1vx7iOxyePg',
+  },
+  {
+    id: 'reloj-de-arena',
+    title: 'El Reloj de Arena Magico',
+    tagline: 'Cuando la arena se acaba, tambien el tiempo.',
+    synopsis:
+      'Un reloj de arena magico encontrado en el attic pierde arena cada hora y con ella se pierde un recuerdo de la Escuela. Thriller sobre el tiempo y la memoria.',
+    year: 2025,
+    rating: 'PG-13',
+    durationMinutes: 121,
+    score: 8.9,
+    house: 'hufflepuff',
+    category: 'time-turners',
+    genres: ['Ciencia Ficcion', 'Suspense', 'Magia'],
+    cast: [
+      { name: 'Blaise Zabini', character: 'El Observador' },
+      { name: 'Avery Penhaligon', character: 'La Memoriosa' },
+      { name: 'Penelope Greengrass', character: 'La Cronista' },
+    ],
+    backdrop: BACKDROP('sand-clock'),
+    poster: POSTER('sand-clock'),
+    trailerId: 'DJ1sRlZ0PQ0',
+  },
+
+]
+
+/** Devuelve el hechizo buscado por su id. */
+export const getMovieById = (id: string): Movie | undefined =>
+  MOVIES.find((movie) => movie.id === id)
+
+/** Devuelve la lista de hechizos de una categoria. */
+export const getMoviesByCategory = (categoryId: Movie['category']): Movie[] =>
+  MOVIES.filter((movie) => movie.category === categoryId)

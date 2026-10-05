@@ -1,0 +1,280 @@
+@import 'tailwindcss';
+
+/* =========================================================================
+   POTTERFLIX — SISTEMA DE DISENO HOGWARTS
+   Paleta: #0a0b10 noche, #121520 pergamino, #d4af37 oro, casas Slytherin /
+   Gryffindor / Ravenclaw.
+   ========================================================================= */
+
+@theme {
+  /* Fondos */
+  --color-night: #0a0b10;
+  --color-parchment: #121520;
+  --color-ink: #1b1f2e;
+
+  /* Acentos magicos */
+  --color-gold: #d4af37;
+  --color-gold-light: #f3d97b;
+  --color-gold-dark: #8c6f1f;
+
+  /* Casas */
+  --color-gryffindor: #740001;
+  --color-slytherin: #1a472a;
+  --color-ravenclaw: #0e1a40;
+  --color-hufflepuff: #d4af37;
+
+  /* Tipografia magica */
+  --font-display: 'Cinzel', 'Trajan Pro', 'Georgia', serif;
+  --font-body: 'Inter', 'Segoe UI', system-ui, sans-serif;
+
+  /* Animaciones */
+  --animate-ember: ember 7s linear infinite;
+  --animate-flicker: flicker 4s ease-in-out infinite;
+  --animate-shimmer: shimmer 3.5s linear infinite;
+  --animate-float: float 9s ease-in-out infinite;
+  --animate-pulse-ring: pulse-ring 2.4s ease-out infinite;
+}
+
+@keyframes ember {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translate3d(var(--drift, 40px), -110vh, 0) scale(0.2);
+    opacity: 0;
+  }
+}
+
+@keyframes flicker {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  45% {
+    opacity: 0.92;
+  }
+  50% {
+    opacity: 0.98;
+  }
+  52% {
+    opacity: 0.88;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-14px) rotate(3deg);
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(2.1);
+    opacity: 0;
+  }
+}
+
+@keyframes spell-ripple {
+  0% {
+    transform: scale(0.4);
+    opacity: 0.85;
+  }
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+@keyframes fog-drift {
+  0% {
+    transform: translateX(-4%) scale(1);
+  }
+  50% {
+    transform: translateX(4%) scale(1.08);
+  }
+  100% {
+    transform: translateX(-4%) scale(1);
+  }
+}
+
+/* =========================================================================
+   CAPA BASE
+   ========================================================================= */
+
+@layer base {
+  * {
+    border-color: rgb(212 175 55 / 0.12);
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--color-night);
+    color: #e8e6e1;
+    font-family: var(--font-body);
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* El cursor nativo se oculta: lo reemplaza WandCursor. */
+  body.has-wand-cursor,
+  body.has-wand-cursor * {
+    cursor: none !important;
+  }
+
+  ::selection {
+    background: rgb(212 175 55 / 0.3);
+    color: #fff;
+  }
+
+  /* Barra de desplazamiento dorada */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--color-night);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, var(--color-gold-dark), #3a3212);
+    border-radius: 999px;
+    border: 2px solid var(--color-night);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, var(--color-gold), var(--color-gold-dark));
+  }
+
+  /* Accesibilidad: respeta la preferencia de movimiento reducido. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* =========================================================================
+   UTILIDADES MAGICAS
+   ========================================================================= */
+
+@layer components {
+  /* Titulo gotico con borde dorado iluminado */
+  .glow-effect {
+    color: #fff;
+    text-shadow:
+      0 0 8px rgb(212 175 55 / 0.55),
+      0 0 22px rgb(212 175 55 / 0.35),
+      0 2px 4px rgb(0 0 0 / 0.9);
+  }
+
+  .glow-gold {
+    box-shadow:
+      0 0 0 1px rgb(212 175 55 / 0.45),
+      0 0 18px rgb(212 175 55 / 0.28),
+      inset 0 0 22px rgb(212 175 55 / 0.1);
+  }
+
+  .glow-soft {
+    box-shadow: 0 10px 40px -12px rgb(212 175 55 / 0.35);
+  }
+
+  /* Texto con degradado dorado de Snitch */
+  .text-gold-gradient {
+    background: linear-gradient(
+      100deg,
+      #8c6f1f 0%,
+      #d4af37 22%,
+      #fff3c4 42%,
+      #d4af37 62%,
+      #f3d97b 78%,
+      #8c6f1f 100%
+    );
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .animate-shimmer {
+    animation: var(--animate-shimmer);
+  }
+
+  /* Superficie de pergamino para el modal */
+  .parchment {
+    background:
+      radial-gradient(circle at 18% 12%, rgb(212 175 55 / 0.13), transparent 45%),
+      radial-gradient(circle at 82% 88%, rgb(28 24 12 / 0.9), transparent 50%),
+      linear-gradient(155deg, #1a1c26 0%, #12141d 55%, #0d0f16 100%);
+  }
+
+  /* Niebla magica que cubre las tarjetas antes del Revelio */
+  .magic-fog {
+    background:
+      radial-gradient(circle at 30% 35%, rgb(120 130 170 / 0.5), transparent 55%),
+      radial-gradient(circle at 70% 65%, rgb(90 100 140 / 0.45), transparent 55%),
+      linear-gradient(160deg, rgba(30, 34, 52, 0.97), rgba(14, 16, 24, 0.98));
+    animation: fog-drift 9s ease-in-out infinite;
+  }
+
+  /* Sello de cera de Hogwarts */
+  .wax-seal {
+    background:
+      radial-gradient(circle at 34% 28%, #a5232a 0%, #740001 45%, #3c0000 100%);
+    box-shadow:
+      inset 0 2px 6px rgb(255 255 255 / 0.22),
+      inset 0 -4px 10px rgb(0 0 0 / 0.55),
+      0 4px 14px rgb(116 0 1 / 0.55);
+  }
+
+  /* Fila horizontal con scroll invisible pero funcional */
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Marco parlante del castillo */
+  .speaking-frame {
+    border: 1px solid rgb(212 175 55 / 0.35);
+    box-shadow:
+      0 0 0 1px rgb(0 0 0 / 0.6),
+      0 0 0 4px rgb(18 21 32 / 0.9),
+      0 0 0 5px rgb(212 175 55 / 0.18),
+      0 30px 80px -20px rgb(0 0 0 / 0.95);
+  }
+
+  /* Pulso de hechizo al tocar una tarjeta */
+  .spell-ripple {
+    animation: spell-ripple 1.1s ease-out forwards;
+  }
+}
