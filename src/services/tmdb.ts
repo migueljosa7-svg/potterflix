@@ -50,32 +50,32 @@ export const HOUSES: HouseMeta[] = [
     accent: '#ff8a7a',
     aura: 'rgba(255, 138, 122, 0.3)',
     sigil: '🦁',
-    genreIds: [28, 12, 14],
-    genreLabels: ['Accion', 'Aventura', 'Fantasia'],
+    genreIds: [28, 12, 14, 10752, 10759],
+    genreLabels: ['Acción', 'Aventura', 'Fantasía', 'Bélica', 'Action & Adventure'],
   },
   {
     id: 'slytherin',
     name: 'Slytherin',
-    motto: 'Ambicion y astucia',
+    motto: 'Ambición y astucia',
     color: '#1a472a',
     secondary: '#e0e0e0',
     accent: '#7dfcb0',
     aura: 'rgba(125, 252, 176, 0.28)',
     sigil: '🐍',
-    genreIds: [27, 9648, 53],
-    genreLabels: ['Terror', 'Misterio', 'Thriller'],
+    genreIds: [27, 9648, 53, 80],
+    genreLabels: ['Terror', 'Misterio', 'Thriller', 'Crimen'],
   },
   {
     id: 'ravenclaw',
     name: 'Ravenclaw',
-    motto: 'Ingenio y sabiduria',
+    motto: 'Ingenio y sabiduría',
     color: '#0e1a40',
     secondary: '#cd7f32',
     accent: '#a9c8ff',
     aura: 'rgba(169, 200, 255, 0.3)',
     sigil: '🦅',
-    genreIds: [878, 99, 36],
-    genreLabels: ['Ciencia Ficcion', 'Documental', 'Historia'],
+    genreIds: [878, 9648, 99, 36],
+    genreLabels: ['Ciencia Ficción', 'Misterio', 'Documental', 'Historia'],
   },
   {
     id: 'hufflepuff',
@@ -86,8 +86,8 @@ export const HOUSES: HouseMeta[] = [
     accent: '#ffd75e',
     aura: 'rgba(255, 215, 94, 0.28)',
     sigil: '🦡',
-    genreIds: [35, 10749, 16],
-    genreLabels: ['Comedia', 'Romance', 'Animacion'],
+    genreIds: [35, 18, 10751, 16, 10749],
+    genreLabels: ['Comedia', 'Drama', 'Familiar', 'Animación', 'Romance'],
   },
 ]
 /** Filas del catalogo, una por casa. */
@@ -98,11 +98,13 @@ export const CATEGORIES: Category[] = HOUSES.map((house) => ({
   description: house.motto,
   accent: house.accent,
 }))
-/** Casa a la que pertenece un genero de TMDB. */
+/** Casa a la que pertenece un genero de TMDB (primera casa wins: Slytherin conserva Misterio). */
 const HOUSE_BY_GENRE: Record<number, House> = (() => {
   const map: Record<number, House> = {}
   for (const house of HOUSES) {
-    for (const genre of house.genreIds) map[genre] = house.id
+    for (const genre of house.genreIds) {
+      if (!(genre in map)) map[genre] = house.id
+    }
   }
   return map
 })()
@@ -111,7 +113,7 @@ const GENRE_LABELS: Record<number, string> = (() => {
   const map: Record<number, string> = {}
   for (const house of HOUSES) {
     house.genreIds.forEach((genre, index) => {
-      map[genre] = house.genreLabels[index]
+      if (!(genre in map)) map[genre] = house.genreLabels[index]
     })
   }
   return map
@@ -239,9 +241,35 @@ export async function getTrending(
     )
 }
 /**
- * GET /discover/movie | /discover/tv — catalogo por generos de una casa.
- * `page` se limita a 3 porque la app solo muestra las primeras filas.
+ * GET /discover/movie | /discover/tv — catalogo por generos de una casa (OR).
+ * TMDB une con `,` en AND; con `|` en OR, que es lo que quiere una casa:
+ * Accion O Aventura O Fantasia. Ademas sanea IDs segun el medio porque varios
+ * generos solo existen en un lado (ej. 10759 solo en TV, 28/14/878 solo en
+ * cine): los traduce a su equivalente para no pedir discovers vacios.
  */
+const TV_EQUIVALENTS: Record<number, number> = {
+  28: 10759,
+  12: 10759,
+  14: 10765,
+  10752: 10768,
+  27: 9648,
+  53: 80,
+  878: 10765,
+  36: 10768,
+  10749: 18,
+}
+const MOVIE_EQUIVALENTS: Record<number, number> = {
+  10759: 28,
+  10765: 878,
+  10768: 10752,
+  10762: 10751,
+}
+/** Generos validos para el medio pedido, sin duplicados y sin vacios. */
+export function genreIdsForMedia(genreIds: number[], mediaType: MediaType): number[] {
+  const table = mediaType === 'tv' ? TV_EQUIVALENTS : MOVIE_EQUIVALENTS
+  const mapped = genreIds.map((genre) => table[genre] ?? genre)
+  return [...new Set(mapped)]
+}
 export async function discoverByGenre(
   genreIds: number[],
   mediaType: MediaType,
@@ -250,8 +278,9 @@ export async function discoverByGenre(
 ): Promise<MediaItem[]> {
   const path =
     mediaType === 'movie' ? '/discover/movie' : '/discover/tv'
+  const valid = genreIdsForMedia(genreIds, mediaType)
   const data = await request<TmdbListResponse<TmdbMovieResult>>(
-    `${path}?with_genres=${genreIds.join(',')}&sort_by=popularity.desc` +
+    `${path}?with_genres=${valid.join('|')}&sort_by=popularity.desc` +
       `&page=${page}&include_adult=false`,
     signal,
   )

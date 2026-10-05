@@ -43,6 +43,13 @@
   --animate-flame-flicker: flame-flicker 1.6s ease-in-out infinite;
   --animate-rune-glow: rune-glow 3.2s ease-in-out infinite;
   --animate-gold-pulse: gold-pulse 2s ease-in-out infinite;
+
+  /* Cromo Místico 3D — oro viejo / bronce / pergamino envejecido */
+  --color-bronze: #8c6f1f;
+  --color-bronze-deep: #5a4510;
+  --color-parchment-aged-1: #2a2317;
+  --color-parchment-aged-2: #1c1917;
+  --color-parchment-aged-3: #12100c;
 }
 
 /* Aura de la casa activa, reescrita en caliente por el conmutador. */
@@ -458,11 +465,27 @@
 
   /* Contenedor exterior: define la perspectiva 3D y el tamaño mínimo. */
   .cromo-scene {
-    perspective: 900px;
+    perspective: 1100px;
     perspective-origin: 50% 40%;
+    will-change: transform;
   }
 
-  /* Cromo de Hogwarts: filigrana dorada tallada sobre pergamino oscuro. */
+  /* Elevación del cromo en hover/foco: CSS puro (prohibido JS en hover). */
+  .cromo-lift {
+    will-change: transform, box-shadow;
+    transition:
+      transform 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 0.4s ease;
+  }
+  .group:hover .cromo-lift,
+  .group:focus-within .cromo-lift {
+    transform: scale(1.05) translate3d(0, -4px, 0);
+    box-shadow:
+      0 20px 60px -12px rgb(0 0 0 / 0.9),
+      0 0 40px -8px var(--house-aura, rgb(255 215 0 / 0.33));
+  }
+
+  /* Cromo de Hogwarts (legado): filigrana dorada sobre pergamino oscuro. */
   .cromo-frame {
     position: relative;
     border: 2px solid rgb(255 215 0 / 0.6);
@@ -690,5 +713,101 @@
     box-shadow:
       inset 0 0 30px rgba(0, 0, 0, 0.5),
       0 0 0 1px rgba(255, 215, 0, 0.08);
+  }
+
+  /* ====================================================================
+     CROMO MÁGICO 3D AAA — pergamino envejecido + oro viejo + filigrana
+     Solo transform/opacity/will-change (60 FPS, GPU). Sin JS en hover.
+     ==================================================================== */
+  /* Marco metálico oro viejo / bronce: gradiente real de 3px, no border. */
+  .cromo-frame-3d {
+    padding: 3px;
+    border-radius: 0.8rem;
+    background: linear-gradient(
+      135deg,
+      #fff3c4 0%,
+      #d4af37 22%,
+      #8c6f1f 48%,
+      #d4af37 72%,
+      #5a4510 100%
+    );
+    box-shadow:
+      inset 0 1px 1px rgb(255 243 196 / 0.8),
+      inset 0 -1px 2px rgb(0 0 0 / 0.6),
+      0 8px 32px -8px rgb(0 0 0 / 0.9);
+  }
+
+  /* Pergamino místico envejecido: vetas + moteado + viñeta oscura. */
+  .parchment-aged {
+    background:
+      radial-gradient(ellipse at 50% 22%, rgb(255 215 0 / 0.14) 0%, transparent 60%),
+      repeating-linear-gradient(
+        48deg,
+        rgb(255 215 0 / 0.025) 0px,
+        rgb(255 215 0 / 0.025) 1px,
+        transparent 1px,
+        transparent 5px
+      ),
+      repeating-linear-gradient(
+        -32deg,
+        rgb(0 0 0 / 0.18) 0px,
+        rgb(0 0 0 / 0.18) 2px,
+        transparent 2px,
+        transparent 7px
+      ),
+      radial-gradient(ellipse at 50% 120%, rgb(0 0 0 / 0.55) 0%, transparent 55%),
+      linear-gradient(160deg, #2a2317 0%, #1c1917 50%, #12100c 100%);
+  }
+
+  /* Filigrana dorada en las 4 esquinas (SVG inline, GPU-friendly). */
+  .filigree-corner {
+    position: absolute;
+    width: 34px;
+    height: 34px;
+    pointer-events: none;
+    opacity: 0.92;
+    background-repeat: no-repeat;
+    background-size: contain;
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 34 34'%3E%3Cpath d='M2 32 V10 Q2 2 10 2 H32' fill='none' stroke='%23d4af37' stroke-width='2'/%3E%3Cpath d='M7 32 V13 Q7 7 13 7 H32' fill='none' stroke='%23fff3c4' stroke-width='1' opacity='.7'/%3E%3Ccircle cx='6' cy='6' r='2.4' fill='%23ffd700'/%3E%3C/svg%3E");
+  }
+  .filigree-tl { top: 7px; left: 7px; }
+  .filigree-tr { top: 7px; right: 7px; transform: scaleX(-1); }
+  .filigree-bl { bottom: 7px; left: 7px; transform: scaleY(-1); }
+  .filigree-br { bottom: 7px; right: 7px; transform: scale(-1, -1); }
+
+  /* Sello de cera por casa (data-house): relieve + aura GPU. */
+  .wax-seal[data-house='gryffindor'] {
+    background: radial-gradient(circle at 34% 28%, #b5252d 0%, #740001 45%, #3c0000 100%);
+    box-shadow:
+      inset 0 2px 6px rgb(255 255 255 / 0.22),
+      inset 0 -4px 10px rgb(0 0 0 / 0.55),
+      0 4px 14px rgb(116 0 1 / 0.55);
+  }
+  .wax-seal[data-house='slytherin'] {
+    background: radial-gradient(circle at 34% 28%, #2f7d4b 0%, #1a472a 45%, #08130d 100%);
+    box-shadow:
+      inset 0 2px 6px rgb(255 255 255 / 0.22),
+      inset 0 -4px 10px rgb(0 0 0 / 0.55),
+      0 4px 14px rgb(26 71 42 / 0.6);
+  }
+  .wax-seal[data-house='ravenclaw'] {
+    background: radial-gradient(circle at 34% 28%, #2b3f8f 0%, #0e1a40 45%, #05081a 100%);
+    box-shadow:
+      inset 0 2px 6px rgb(255 255 255 / 0.22),
+      inset 0 -4px 10px rgb(0 0 0 / 0.55),
+      0 4px 14px rgb(14 26 64 / 0.65);
+  }
+  .wax-seal[data-house='hufflepuff'] {
+    background: radial-gradient(circle at 34% 28%, #f3cd5a 0%, #b58c1e 45%, #5a4510 100%);
+    box-shadow:
+      inset 0 2px 6px rgb(255 255 255 / 0.35),
+      inset 0 -4px 10px rgb(0 0 0 / 0.45),
+      0 4px 14px rgb(236 185 57 / 0.5);
+  }
+
+  /* Destello místico del reverso: solo opacity/transform (GPU). */
+  .revelio-glow {
+    will-change: opacity, transform;
+    transform: translate3d(0, 0, 0);
   }
 }

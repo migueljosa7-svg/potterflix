@@ -219,9 +219,9 @@ function generateBackdrop(seed: FallbackSeed, width = 1600, height = 900): strin
  * Es la unica fuente de datos cuando no hay API key de TMDB.
  */
 export const FALLBACK_CATALOG: MediaItem[] = FALLBACK_SEEDS.map((seed) => ({
-  id: 'movie-' + seed.tmdbId,
+  id: (seed.mediaType ?? 'movie') + '-' + seed.tmdbId,
   tmdbId: seed.tmdbId,
-  mediaType: 'movie' as const,
+  mediaType: seed.mediaType ?? ('movie' as const),
   title: seed.title,
   originalTitle: seed.originalTitle,
   tagline: seed.tagline,

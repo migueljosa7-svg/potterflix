@@ -32,10 +32,10 @@ const VALID_HOUSES: House[] = ['gryffindor', 'slytherin', 'ravenclaw', 'hufflepu
  * los generos de TMDB mapeados a su casa (ver `HOUSES` en services/tmdb.ts).
  */
 const ROW_COPY: Record<CategoryId, string> = {
-  gryffindor: 'Encantamientos & Aventura',
-  slytherin: 'Artes Oscuras & Misterio',
-  ravenclaw: 'Giratiempos & Enigmas',
-  hufflepuff: 'Pociones de Amor & Alegría',
+  gryffindor: 'Acción · Aventura · Fantasía',
+  slytherin: 'Thriller · Crimen · Terror',
+  ravenclaw: 'Sci-Fi · Misterio · Historia',
+  hufflepuff: 'Comedia · Drama · Familia',
 }
 
 /** Descripcion de una fila: lema magico + generos de TMDB que la alimentan. */

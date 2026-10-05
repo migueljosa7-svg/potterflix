@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import type { LoadState, MediaItem } from '../types/tmdb'
+import { HOUSES } from '../services/tmdb'
 import CromoSkeleton from './CromoSkeleton'
 import MovieCard from './MovieCard'
 
@@ -182,6 +183,17 @@ function CategoryRow({
           <p className="mt-1.5 text-xs font-medium text-vellum/75 sm:text-sm">
             {description}
           </p>
+          {/* Píldoras de géneros globales de la casa (solo lectura, GPU) */}
+          <div className="mt-2.5 flex flex-wrap gap-1.5" aria-label={'Géneros de ' + title}>
+            {(HOUSES.find((house) => house.id === id)?.genreLabels ?? []).slice(0, 5).map((genre) => (
+              <span
+                key={genre}
+                className="rounded-full border border-gold/30 bg-night/70 px-2.5 py-0.5 font-display text-[0.58rem] font-bold uppercase tracking-[0.14em] text-gold-light/90"
+              >
+                {genre}
+              </span>
+            ))}
+          </div>
         </div>
 
         {/* Flechas doradas (solo escritorio) */}

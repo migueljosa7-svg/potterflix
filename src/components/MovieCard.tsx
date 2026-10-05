@@ -90,64 +90,35 @@ function MovieCard({ item, index, onSelect, saved, onToggleSave }: MovieCardProp
       /* Precarga el chunk de la ficha al apuntar: la animacion FLIP nunca
          tendra que esperar a la red en el primer clic. */
       onPointerEnter={preloadMagicModal}
-      className="cromo-enter cromo-scene group relative block shrink-0 overflow-hidden rounded-xl text-left outline-none"
+      data-house={item.house}
+      className="cromo-enter cromo-scene cromo-lift group relative block shrink-0 overflow-hidden rounded-xl text-left outline-none"
       style={{
         animationDelay: Math.min(index * 0.055, 0.44) + 's',
         /* Tamaño mínimo garantizado por el prompt V4.0 */
         width: '240px',
         height: '360px',
-        transition: 'transform 0.4s cubic-bezier(0.22,1,0.36,1), box-shadow 0.4s ease',
-      }}
-      onMouseEnter={(e) => {
-        const el = e.currentTarget
-        el.style.transform = 'scale(1.05) translateY(-4px)'
-        el.style.boxShadow = `0 20px 60px -12px rgba(0,0,0,0.9), 0 0 0 2px ${accent}66, 0 0 40px -8px ${accent}55`
-      }}
-      onMouseLeave={(e) => {
-        const el = e.currentTarget
-        el.style.transform = ''
-        el.style.boxShadow = ''
       }}
     >
       {/* ======== FLIP CONTAINER ======== */}
       <div
-        className="card-flipper"
-        style={{
-          transform: touched ? 'rotateY(180deg)' : '',
-        }}
+        className={'card-flipper gpu' + (touched ? ' is-flipped' : '')}
       >
-        {/* ====== CARA DELANTERA: CROMO DE HOGWARTS ====== */}
-        <div className="card-face card-face-front cromo-frame cromo-corner absolute inset-0 rounded-xl">
-          {/* Fondo de pergamino oscuro con textura */}
-          <div
-            className="absolute inset-0 rounded-xl"
-            style={{
-              background:
-                'radial-gradient(ellipse at 50% 28%, rgba(255,215,0,0.12) 0%, transparent 58%),' +
-                'repeating-linear-gradient(48deg, rgba(255,215,0,0.022) 0px, rgba(255,215,0,0.022) 1px, transparent 1px, transparent 5px),' +
-                'linear-gradient(160deg, #241d13 0%, #1c1917 45%, #14110d 100%)',
-            }}
-          />
-
-          {/* Ornamentos de filigrana en las 4 esquinas adicionales (inferior izq y sup der) */}
-          <span
-            className="pointer-events-none absolute left-2 top-2 h-8 w-8 border-l-2 border-t-2 border-gold/80"
-            aria-hidden="true"
-          />
-          <span
-            className="pointer-events-none absolute right-2 bottom-2 h-8 w-8 border-r-2 border-b-2 border-gold/80"
-            aria-hidden="true"
-          />
+        {/* ====== CARA DELANTERA: CROMO MÍSTICO 3D ====== */}
+        <div className="card-face card-face-front cromo-frame-3d absolute inset-0 rounded-xl">
+          <div className="parchment-aged relative h-full w-full overflow-hidden rounded-[0.65rem]">
+          {/* Filigrana dorada en las 4 esquinas */}
+          <span className="filigree-corner filigree-tl" aria-hidden="true" />
+          <span className="filigree-corner filigree-tr" aria-hidden="true" />
+          <span className="filigree-corner filigree-bl" aria-hidden="true" />
+          <span className="filigree-corner filigree-br" aria-hidden="true" />
 
           {/* Centro: sello de cera con sigilo de la casa */}
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
-            {/* Sello de cera con runas orbitando */}
+            {/* Sello de cera con runas orbitando (color por data-house) */}
             <div className="relative flex flex-col items-center">
               <div
+                data-house={item.house}
                 className="wax-seal animate-gold-pulse relative flex h-24 w-24 items-center justify-center rounded-full"
-                style={{
-                  boxShadow: `inset 0 3px 8px rgba(255,255,255,0.25), inset 0 -5px 12px rgba(0,0,0,0.6), 0 6px 20px ${accent}66`,
-                }}
               >
                 {/* Runas orbitando */}
                 <span
@@ -202,14 +173,14 @@ function MovieCard({ item, index, onSelect, saved, onToggleSave }: MovieCardProp
             </div>
           </div>
 
-          {/* Botón de apertura: contenido vacio y hermano del resto del cromo
-              (HTML valido, nombre accesible explicito, foco visible). */}
+          {/* Botón invisible de apertura (frontal): hermano válido, sin anidar */}
           <button
             type="button"
             onClick={handleClick}
             aria-label={'Ver ficha de ' + item.title}
-            className="absolute inset-0 z-20 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold"
+            className="absolute inset-0 z-20 cursor-pointer rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold"
           />
+          </div>
         </div>
 
         {/* ====== CARA TRASERA: POSTER HD DE TMDB ====== */}
@@ -236,9 +207,9 @@ function MovieCard({ item, index, onSelect, saved, onToggleSave }: MovieCardProp
           {/* Velo inferior para contraste del texto */}
           <div className="absolute inset-0 bg-gradient-to-t from-night via-night/50 to-transparent" />
 
-          {/* Destello dorado del Revelio */}
+          {/* Destello místico del reverso (GPU: solo opacity/transform) */}
           <div
-            className="pointer-events-none absolute inset-0 rounded-xl"
+            className="revelio-glow pointer-events-none absolute inset-0 rounded-xl opacity-60 transition-opacity duration-500 group-hover:opacity-100"
             style={{
               background: `radial-gradient(ellipse at 50% 30%, ${accent}33, transparent 65%)`,
             }}
