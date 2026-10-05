@@ -1,16 +1,26 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import CategoryRow from './components/CategoryRow'
+import CromoSkeleton from './components/CromoSkeleton'
 import FloatingCandles from './components/FloatingCandles'
 import MagicHero from './components/MagicHero'
-import MagicModal from './components/MagicModal'
 import Navbar from './components/Navbar'
 import WandCursor from './components/WandCursor'
+import WandSparks from './components/WandSparks'
 import MovieCard from './components/MovieCard'
 import { CATEGORIES, HOUSES, hasApiKey } from './services/tmdb'
 import { useCatalog, useHero, useSearch } from './hooks/useCatalog'
 import { useMyList } from './hooks/useMyList'
 import { FALLBACK_CATALOG } from './data/fallbackCatalog'
+import { loadMagicModal, preloadMagicModal } from './lib/preloadModal'
 import type { CategoryId, House, LoadState, MediaItem, MediaType, ViewTab } from './types/tmdb'
+
+/**
+ * Ficha de detalle fuera del bundle inicial: `React.lazy` + precarga en el
+ * primer ocio (y al pasar el puntero sobre una carta) para que la animacion
+ * FLIP nunca espere a descargar el chunk.
+ */
+const MagicModal = lazy(loadMagicModal)
 
 /** Casa inicial y clave de almacenamiento de la preferencia del usuario. */
 const DEFAULT_HOUSE: House = 'gryffindor'
@@ -24,7 +34,7 @@ const VALID_HOUSES: House[] = ['gryffindor', 'slytherin', 'ravenclaw', 'hufflepu
 const ROW_COPY: Record<CategoryId, string> = {
   gryffindor: 'Encantamientos & Aventura',
   slytherin: 'Artes Oscuras & Misterio',
-  ravenclaw: 'Girotiempos & Enigmas',
+  ravenclaw: 'Giratiempos & Enigmas',
   hufflepuff: 'Pociones de Amor & Alegría',
 }
 
@@ -68,6 +78,15 @@ export default function App() {
   const showHero = !searching && tab === 'home'
   const rowsEnabled = !searching && (tab === 'home' || tab === 'movies' || tab === 'series')
   const mediaType: MediaType = tab === 'series' ? 'tv' : 'movie'
+
+  /**
+   * Clave de la vista actual: `AnimatePresence` cruza la salida de la
+   * pestaña anterior con la entrada de la nueva. Con `mode="wait"` solo hay
+   * un nodo en el DOM (sin solapes ni saltos de layout: CLS = 0).
+   */
+  const viewKey = searching ? 'search' : tab
+  /** Transiciones instantaneas para quien pide movimiento reducido. */
+  const reduceMotion = useReducedMotion()
 
   const hero = useHero(showHero)
   const gryffindor = useCatalog('gryffindor', mediaType, rowsEnabled)
@@ -137,8 +156,34 @@ export default function App() {
     }
   }, [activeHouse])
 
+  /* ============ Code-splitting: precarga de la ficha ============
+     `MagicModal` vive en su propio chunk. Si el usuario hace clic antes de
+     que llegue, el clon de la animacion FLIP aterrizaria sin ficha debajo,
+     asi que lo invocamos en el primer ocio del navegador (y de paso se
+     reutiliza la promesa memoizada de `preloadMagicModal`). */
+  useEffect(() => {
+    if (typeof window.requestIdleCallback === 'function') {
+      const handle = window.requestIdleCallback(() => preloadMagicModal(), { timeout: 3000 })
+      return () => window.cancelIdleCallback(handle)
+    }
+    // Navegadores sin requestIdleCallback (Safari antiguo): precarga tardia.
+    const timer = window.setTimeout(() => preloadMagicModal(), 1200)
+    return () => window.clearTimeout(timer)
+  }, [])
+
   /* ============ Callbacks estables para los hijos memoizados ============ */
-  const openModal = useCallback((item: MediaItem) => setSelected(item), [])
+  /**
+   * Rectangulo de la carta/pieza que dispara el modal. MagicModal lo usa para
+   * animar la apertura FLIP: la carta "se abre" y crece hasta convertirse en
+   * la ficha, sin pantalla negra ni salto seco. Solo se escribe al abrir, para
+   * que el cierre pueda volver al mismo origen.
+   */
+  const [originRect, setOriginRect] = useState<DOMRect | null>(null)
+
+  const openModal = useCallback((item: MediaItem, origin?: DOMRect) => {
+    setOriginRect(origin ?? null)
+    setSelected(item)
+  }, [])
   const closeModal = useCallback(() => setSelected(null), [])
 
   const handleTabChange = useCallback((next: ViewTab) => {
@@ -153,10 +198,7 @@ export default function App() {
       {state === 'loading' && items.length === 0 && (
         <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6">
           {Array.from({ length: 12 }, (_, index) => (
-            <div
-              key={index}
-              className="aspect-[2/3] w-full animate-pulse rounded-lg border border-gold/20 bg-ink"
-            />
+            <CromoSkeleton key={index} index={index} className="aspect-[2/3] w-full" />
           ))}
         </div>
       )}
@@ -190,6 +232,8 @@ export default function App() {
       {/* Velo del Gran Comedor y varita optimizada */}
       <FloatingCandles />
       <WandCursor />
+      {/* Explosiones de chispas al guardar en Mi Lista (canvas, sin re-renders) */}
+      <WandSparks />
 
       <Navbar
         activeTab={tab}
@@ -203,8 +247,21 @@ export default function App() {
       />
 
       <main>
-        {/* ============ BUSCADOR GLOBAL: rejilla de resultados ============ */}
-        {searching ? (
+        {/*
+          Transicion entre pestanas (AnimatePresence + cascada): la vista
+          saliente se desvanece y la entrante sube suave. Las filas y las
+          cartas se revelan ademas con stagger (revealIndex y cromo-enter).
+        */}
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={viewKey}
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: reduceMotion ? 0 : 0.3, ease: [0.22, 1, 0.36, 1] }}
+          >
+            {/* ============ BUSCADOR GLOBAL: rejilla de resultados ============ */}
+            {searching ? (
           <section className="parchment min-h-screen px-4 pb-24 pt-28 sm:px-8 lg:px-12">
             <div className="mx-auto max-w-[1600px]">
               <p className="font-display text-xs font-bold uppercase tracking-[0.3em] text-gold">
@@ -286,7 +343,7 @@ export default function App() {
             <div
               className={'relative z-10 pb-24 ' + (showHero ? '-mt-10 sm:-mt-16' : 'pt-28')}
             >
-              {rows.map(({ category, data }) => (
+              {rows.map(({ category, data }, rowIndex) => (
                 <CategoryRow
                   key={category.id + '-' + mediaType}
                   id={category.id}
@@ -296,6 +353,7 @@ export default function App() {
                   items={data.items}
                   state={data.state}
                   onSelect={openModal}
+                  revealIndex={rowIndex}
                   savedIds={savedIds}
                   onToggleSave={myList.toggle}
                 />
@@ -303,6 +361,8 @@ export default function App() {
             </div>
           </>
         )}
+          </motion.div>
+        </AnimatePresence>
       </main>
 
       {/* Pie magico */}
@@ -322,13 +382,16 @@ export default function App() {
         </div>
       </footer>
 
-      {/* Modal reproductor con el trailer oficial de YouTube */}
-      <MagicModal
-        item={selected}
-        onClose={closeModal}
-        saved={selected ? savedIds.has(selected.id) : false}
-        onToggleSave={myList.toggle}
-      />
+      {/* Modal reproductor con el trailer oficial de YouTube (chunk diferido) */}
+      <Suspense fallback={null}>
+        <MagicModal
+          item={selected}
+          origin={originRect}
+          onClose={closeModal}
+          saved={selected ? savedIds.has(selected.id) : false}
+          onToggleSave={myList.toggle}
+        />
+      </Suspense>
     </div>
   )
 }

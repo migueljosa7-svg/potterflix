@@ -1,13 +1,20 @@
-import { useEffect, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { Bookmark, Calendar, Check, Clock, ExternalLink, Loader2, Play, Star, X } from 'lucide-react'
 import type { MediaItem } from '../types/tmdb'
 import { HOUSES, getDetails, hasApiKey } from '../services/tmdb'
 import { useTrailer } from '../hooks/useCatalog'
+import { burstFromElement, emitListUpdate } from '../lib/magicFx'
 
 interface MagicModalProps {
   /** Titulo seleccionado; `null` cierra el modal. */
   item: MediaItem | null
+  /**
+   * Rectangulo (en coordenadas de viewport) de la carta que abrio el modal.
+   * Es el punto de partida de la animacion FLIP: la carta "se abre" y crece
+   * hasta ocupar el area del reproductor. `null` => entrada por defecto.
+   */
+  origin: DOMRect | null
   onClose: () => void
   /** Si el titulo esta en Mi Lista de Hechizos. */
   saved: boolean
@@ -48,6 +55,9 @@ function TrailerPlayer({
   accent: string
 }) {
   const [failed, setFailed] = useState(false)
+  const reduceMotion = useReducedMotion()
+  /** El iframe de YouTube se invoca al final de la animacion de apertura. */
+  const [armed, setArmed] = useState(false)
 
   useEffect(() => setFailed(false), [item.id, videoKey])
 
@@ -57,7 +67,22 @@ function TrailerPlayer({
     return () => window.clearTimeout(timer)
   }, [videoKey, failed])
 
-  const showEmbed = Boolean(videoKey) && !failed
+  /**
+   * Retrasa el montaje del reproductor: mientras la carta vuela hacia la
+   * ficha (animacion FLIP de ~0,5 s) solo se ve el fondo, sin luchar con un
+   * iframe pesado por la GPU. Si el usuario tiene movimiento reducido, al
+   * instante.
+   */
+  useEffect(() => {
+    setArmed(false)
+    if (!videoKey || failed) return
+    const timer = window.setTimeout(() => setArmed(true), reduceMotion ? 0 : 520)
+    return () => window.clearTimeout(timer)
+  }, [videoKey, failed, reduceMotion])
+
+  const showEmbed = Boolean(videoKey) && !failed && armed
+  /** Falta poco para el trailer: se muestra el fondo con la espera mágica. */
+  const waiting = Boolean(videoKey) && !failed && !armed
 
   return (
     <div className="relative aspect-video w-full overflow-hidden bg-black">
@@ -76,6 +101,13 @@ function TrailerPlayer({
             src={item.backdrop}
             alt=""
             className="absolute inset-0 h-full w-full object-cover opacity-70"
+            onError={(event) => {
+              // Sin 404 visibles: cae al poster (una sola vez, sin bucles).
+              const image = event.currentTarget
+              if (image.dataset.fallback === '1') return
+              image.dataset.fallback = '1'
+              image.src = item.poster
+            }}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-night via-night/60 to-night/20" />
           {/* Velo con color de la casa */}
@@ -86,8 +118,8 @@ function TrailerPlayer({
             }}
           />
 
-          {loading && !videoKey ? (
-            /* ---------- Cargando trailer ---------- */
+          {waiting || (loading && !videoKey) ? (
+            /* ---------- Cargando trailer (o esperando a que aterrice la carta) ---------- */
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
               <div className="relative">
                 <Loader2 className="h-10 w-10 animate-spin text-gold" />
@@ -159,9 +191,28 @@ function TrailerPlayer({
  * YouTube y ficha completa de TMDB. Diseño de pergamino oscuro con sinopsis
  * legible, valoración en Galeones y reparto.
  */
-export default function MagicModal({ item, onClose, saved, onToggleSave }: MagicModalProps) {
+export default function MagicModal({ item, origin, onClose, saved, onToggleSave }: MagicModalProps) {
   const { trailerKey, loading: trailerLoading } = useTrailer(item)
   const [details, setDetails] = useState<MediaItem | null>(null)
+  const reduceMotion = useReducedMotion()
+  /** Contenedor del dialogo: foco inicial, trampa de Tab y `outline` oculto. */
+  const dialogRef = useRef<HTMLDivElement | null>(null)
+
+  /**
+   * Rectangulo final del "portal": coincide con el area de video de la ficha
+   * (hoja `max-w-5xl` = 1024px centrada, con el padding `p-4/sm:p-6/lg:p-8`
+   * del fondo y `aspect-video` del reproductor). Se calcula en lugar de medir
+   * para no esperar un render extra: el clon aterriza exactamente donde va a
+   * aparecer el trailer.
+   */
+  const portalTarget = useMemo(() => {
+    if (!origin || typeof window === 'undefined') return null
+    const vw = window.innerWidth
+    const pad = vw >= 1024 ? 32 : vw >= 640 ? 24 : 16 // lg:p-8 / sm:p-6 / p-4
+    const width = Math.min(1024, vw - pad * 2)
+    const height = (width * 9) / 16 // aspect-video
+    return { top: pad, left: (vw - width) / 2, width, height }
+  }, [origin])
 
   useEffect(() => {
     if (!item) {
@@ -183,7 +234,32 @@ export default function MagicModal({ item, onClose, saved, onToggleSave }: Magic
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
+      if (event.key === 'Escape') {
+        onClose()
+        return
+      }
+      // Trampa de foco: Tab queda dentro de la ficha (dialogo modal).
+      if (event.key !== 'Tab') return
+      const dialog = dialogRef.current
+      if (!dialog) return
+      const focusable = Array.from(
+        dialog.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, iframe, [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((node) => node.getAttribute('aria-hidden') !== 'true')
+      if (focusable.length === 0) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      const active = document.activeElement
+      if (event.shiftKey) {
+        if (active === first || active === dialog) {
+          event.preventDefault()
+          last.focus()
+        }
+      } else if (active === last) {
+        event.preventDefault()
+        first.focus()
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => {
@@ -191,6 +267,19 @@ export default function MagicModal({ item, onClose, saved, onToggleSave }: Magic
       window.removeEventListener('keydown', onKey)
     }
   }, [item, onClose])
+
+  /**
+   * Ciclo de vida del foco: al abrir entra al dialogo y al cerrar vuelve al
+   * elemento que lo abrió (carta, botón del héroe…). Sin esto, el teclado
+   * quedaria perdido en `<body>`.
+   */
+  useEffect(() => {
+    if (!item) return
+    const previous =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null
+    dialogRef.current?.focus({ preventScroll: true })
+    return () => previous?.focus({ preventScroll: true })
+  }, [item])
 
   const title = item?.title ?? ''
   const media = details ?? item
@@ -200,15 +289,18 @@ export default function MagicModal({ item, onClose, saved, onToggleSave }: Magic
   const tmdbLink = media ? tmdbUrl(media) : null
 
   return (
+    <>
     <AnimatePresence>
       {item && media && (
         <motion.div
           key="magic-modal"
+          ref={dialogRef}
+          tabIndex={-1}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.28 }}
-          className="fixed inset-0 z-[200] flex items-start justify-center overflow-y-auto bg-black/90 p-4 backdrop-blur-sm sm:p-6 lg:p-8"
+          className="fixed inset-0 z-[200] flex items-start justify-center overflow-y-auto bg-black/90 p-4 outline-none backdrop-blur-sm sm:p-6 lg:p-8"
           onClick={onClose}
           role="dialog"
           aria-modal="true"
@@ -269,7 +361,12 @@ export default function MagicModal({ item, onClose, saved, onToggleSave }: Magic
                 {/* Guardar en Mi Lista */}
                 <button
                   type="button"
-                  onClick={() => onToggleSave(item)}
+                  onClick={(event) => {
+                    onToggleSave(item)
+                    // Chispas doradas + bump del contador (bus, sin setState).
+                    burstFromElement(event.currentTarget, saved ? 12 : 26)
+                    emitListUpdate({ saved: !saved })
+                  }}
                   aria-pressed={saved}
                   className={
                     'flex shrink-0 items-center gap-2 rounded-lg border-2 px-4 py-2.5 font-display text-xs font-bold uppercase tracking-wider transition-all duration-300 ' +
@@ -399,5 +496,52 @@ export default function MagicModal({ item, onClose, saved, onToggleSave }: Magic
         </motion.div>
       )}
     </AnimatePresence>
+
+    {/*
+      ============ APERTURA FLIP: la carta "se abre" hasta ser la ficha ============
+      Un clon de la carta vuela desde su rectangulo original hasta el area del
+      reproductor y se disuelve al aterrizar, mientras la ficha aparece debajo.
+      Resultado: no hay pantalla negra ni salto seco entre carta y modal.
+      En el cierre el clon vuelve a su carta (mismo recorrido, al reves).
+    */}
+    <AnimatePresence>
+      {item && origin && portalTarget && !reduceMotion && (
+        <motion.div
+          key={'card-open-portal-' + item.id}
+          aria-hidden="true"
+          className="pointer-events-none fixed z-[210] overflow-hidden rounded-xl"
+          initial={{
+            top: origin.top,
+            left: origin.left,
+            width: origin.width,
+            height: origin.height,
+            opacity: 1,
+          }}
+          animate={{
+            top: portalTarget.top,
+            left: portalTarget.left,
+            width: portalTarget.width,
+            height: portalTarget.height,
+            // Opaca durante la primera mitad del vuelo y se disuelve en la
+            // segunda, cuando el reproductor ya esta montado debajo.
+            opacity: [1, 1, 0],
+          }}
+          exit={{
+            top: origin.top,
+            left: origin.left,
+            width: origin.width,
+            height: origin.height,
+            opacity: 1,
+          }}
+          transition={{ duration: 0.52, ease: [0.22, 1, 0.36, 1] }}
+          style={{
+            boxShadow: '0 0 0 2px rgba(255,215,0,0.55), 0 30px 80px -20px rgba(0,0,0,0.9)',
+          }}
+        >
+          <img src={item.poster} alt="" className="h-full w-full object-cover" />
+        </motion.div>
+      )}
+    </AnimatePresence>
+    </>
   )
 }

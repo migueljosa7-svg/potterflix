@@ -1,4 +1,5 @@
 ﻿import { useEffect, useRef } from 'react'
+import { makeSparkSprite } from '../lib/sparkSprite'
 
 /** Una chispa individual de la estela de la varita. */
 interface Spark {
@@ -23,12 +24,6 @@ const SPAWN_DISTANCE = 8
  * visual pero si alivia al recolector de basura.
  */
 const MAX_SPARKS = 140
-/**
- * Lado del sprite pre-renderizado. Todas las chispas reutilizan la misma
- * textura: se evita crear un degradado radial por chispa y fotograma, que era
- * el cuello de botella real del efecto.
- */
-const SPRITE_SIZE = 64
 /** Fotogramas sin actividad tras los cuales se apaga el bucle de animacion. */
 const IDLE_FRAMES = 20
 
@@ -79,25 +74,7 @@ export default function WandCursor() {
     resize()
     window.addEventListener('resize', resize, { passive: true })
 
-    /* Sprites pre-renderizados: un canvas por tono, dibujado UNA sola vez. */
-    const makeSparkSprite = (hue: number): HTMLCanvasElement => {
-      const sprite = document.createElement('canvas')
-      sprite.width = SPRITE_SIZE
-      sprite.height = SPRITE_SIZE
-      const sctx = sprite.getContext('2d')
-      if (!sctx) return sprite
-
-      const c = SPRITE_SIZE / 2
-      const glow = sctx.createRadialGradient(c, c, 0, c, c, c)
-      glow.addColorStop(0, 'hsla(' + hue + ', 100%, 92%, 1)')
-      glow.addColorStop(0.25, 'hsla(' + hue + ', 100%, 70%, 0.55)')
-      glow.addColorStop(0.55, 'hsla(' + hue + ', 95%, 55%, 0.16)')
-      glow.addColorStop(1, 'hsla(' + hue + ', 90%, 45%, 0)')
-      sctx.fillStyle = glow
-      sctx.fillRect(0, 0, SPRITE_SIZE, SPRITE_SIZE)
-      return sprite
-    }
-
+    /* Sprites pre-renderizados (compartidos con WandSparks), una sola vez. */
     const sprites = { gold: makeSparkSprite(45), blue: makeSparkSprite(205) }
 
     // Posicion real del raton y posicion suavizada de la varita.

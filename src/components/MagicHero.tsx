@@ -3,11 +3,12 @@ import { motion } from 'framer-motion'
 import { Check, Info, Play, Plus, Star } from 'lucide-react'
 import type { LoadState, MediaItem } from '../types/tmdb'
 import { HOUSES } from '../services/tmdb'
+import { burstFromElement, emitListUpdate } from '../lib/magicFx'
 
 interface MagicHeroProps {
   items: MediaItem[]
   state: LoadState
-  onSelect: (item: MediaItem) => void
+  onSelect: (item: MediaItem, origin?: DOMRect) => void
   isSaved: (item: MediaItem) => boolean
   onToggleSave: (item: MediaItem) => void
 }
@@ -105,6 +106,13 @@ function MagicHero({ items, state, onSelect, isSaved, onToggleSave }: MagicHeroP
           className="h-full w-full object-cover"
           loading="eager"
           decoding="async"
+          onError={(event) => {
+            // Sin 404 visibles: cae al poster (una sola vez, sin bucles).
+            const image = event.currentTarget
+            if (image.dataset.fallback === '1') return
+            image.dataset.fallback = '1'
+            image.src = current.poster
+          }}
         />
       </motion.div>
 
@@ -208,7 +216,7 @@ function MagicHero({ items, state, onSelect, isSaved, onToggleSave }: MagicHeroP
             {/* Ver Tráiler — botón principal dorado */}
             <motion.button
               type="button"
-              onClick={() => onSelect(current)}
+              onClick={(event) => onSelect(current, event.currentTarget.getBoundingClientRect())}
               whileHover={{ scale: 1.06 }}
               whileTap={{ scale: 0.97 }}
               className="group relative flex items-center gap-2.5 overflow-hidden rounded-lg bg-gold px-7 py-3.5 font-display text-sm font-black uppercase tracking-wider text-night shadow-[0_0_40px_-6px_rgba(255,215,0,0.95)]"
@@ -221,7 +229,7 @@ function MagicHero({ items, state, onSelect, isSaved, onToggleSave }: MagicHeroP
             {/* Más información */}
             <motion.button
               type="button"
-              onClick={() => onSelect(current)}
+              onClick={(event) => onSelect(current, event.currentTarget.getBoundingClientRect())}
               whileHover={{ scale: 1.06 }}
               whileTap={{ scale: 0.97 }}
               className="flex items-center gap-2.5 rounded-lg border-2 border-gold/75 bg-night/72 px-7 py-3.5 font-display text-sm font-bold uppercase tracking-wider text-white backdrop-blur-sm transition-colors hover:bg-gold hover:text-night hover:border-gold"
@@ -233,7 +241,12 @@ function MagicHero({ items, state, onSelect, isSaved, onToggleSave }: MagicHeroP
             {/* Mi Lista */}
             <motion.button
               type="button"
-              onClick={() => onToggleSave(current)}
+              onClick={(event) => {
+                onToggleSave(current)
+                // Chispas doradas + bump del contador (bus, sin setState).
+                burstFromElement(event.currentTarget, saved ? 12 : 26)
+                emitListUpdate({ saved: !saved })
+              }}
               whileHover={{ scale: 1.06 }}
               whileTap={{ scale: 0.97 }}
               aria-pressed={saved}

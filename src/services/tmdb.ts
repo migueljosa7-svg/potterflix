@@ -28,8 +28,8 @@ const API_KEY = (import.meta.env.VITE_TMDB_API_KEY as string | undefined)?.trim(
 export const hasApiKey = API_KEY.length > 0
 /** Tiempo maximo de espera por peticion, en ms. */
 const REQUEST_TIMEOUT = 9000
-/** Imagen por defecto cuando TMDB no devuelve poster ni backdrop. */
-const PLACEHOLDER_IMAGE =
+/** Imagen por defecto cuando TMDB no devuelve poster ni backdrop (data-URI). */
+export const PLACEHOLDER_IMAGE =
   'data:image/svg+xml;charset=utf-8,' +
   encodeURIComponent(
     '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="900">' +

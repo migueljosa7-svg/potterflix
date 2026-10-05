@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import type { LoadState, MediaItem } from '../types/tmdb'
+import CromoSkeleton from './CromoSkeleton'
 import MovieCard from './MovieCard'
 
 interface CategoryRowProps {
@@ -9,9 +10,15 @@ interface CategoryRowProps {
   description: string
   items: MediaItem[]
   state: LoadState
-  /** Identificador de la fila, para el anclaje del menu. */
+  /** Id de la fila, para el anclaje del menu. */
   id: string
-  onSelect: (item: MediaItem) => void
+  onSelect: (item: MediaItem, origin?: DOMRect) => void
+  /**
+   * Posicion de la fila (0-3). Desfasa su revelado tras un cambio de
+   * pestana para que las filas aparezcan en cascada (stagger) y no todas
+   * a la vez. No genera re-renders: es un `transition-delay` en CSS.
+   */
+  revealIndex?: number
   savedIds: Set<string>
   onToggleSave: (item: MediaItem) => void
 }
@@ -37,11 +44,14 @@ function CategoryRow({
   state,
   id,
   onSelect,
+  revealIndex = 0,
   savedIds,
   onToggleSave,
 }: CategoryRowProps) {
   const trackRef = useRef<HTMLDivElement | null>(null)
   const sectionRef = useRef<HTMLElement | null>(null)
+  /** Contenedor de la pista: sobre el se mide y pinta el spotlight. */
+  const areaRef = useRef<HTMLDivElement | null>(null)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(false)
   const [visible, setVisible] = useState(false)
@@ -97,6 +107,47 @@ function CategoryRow({
     return () => observer.disconnect()
   }, [])
 
+  /**
+   * SPOTLIGHT RADIAL — el halo sigue al puntero escribiendo `--pointer-x` y
+   * `--pointer-y` sobre el contenedor de la pista.
+   *
+   * REQUISITO DE RENDIMIENTO: nunca se llama a `setState`, asi que la fila
+   * ni se re-renderiza ni se vuelve a pintar por React. Como mucho hay UNA
+   * escritura de variables CSS por fotograma (batching con `requestAnimationFrame`)
+   * y el navegador solo repinta el gradiente de la capa afectada.
+   */
+  useEffect(() => {
+    const area = areaRef.current
+    if (!area) return
+    // Sin puntero fisico o con movimiento reducido no se instala nada.
+    if (window.matchMedia('(pointer: coarse)').matches) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+
+    let frame = 0
+    let nextX = 0
+    let nextY = 0
+
+    const apply = () => {
+      frame = 0
+      area.style.setProperty('--pointer-x', nextX + 'px')
+      area.style.setProperty('--pointer-y', nextY + 'px')
+    }
+
+    const onMove = (event: PointerEvent) => {
+      const rect = area.getBoundingClientRect()
+      nextX = event.clientX - rect.left
+      nextY = event.clientY - rect.top
+      // Una escritura por fotograma como maximo.
+      if (!frame) frame = window.requestAnimationFrame(apply)
+    }
+
+    area.addEventListener('pointermove', onMove, { passive: true })
+    return () => {
+      if (frame) window.cancelAnimationFrame(frame)
+      area.removeEventListener('pointermove', onMove)
+    }
+  }, [])
+
   /** Desplaza la fila dos tarjetas hacia el lado indicado. */
   const scrollByCards = (direction: 1 | -1) => {
     const track = trackRef.current
@@ -111,10 +162,12 @@ function CategoryRow({
     <section
       ref={sectionRef}
       id={id}
-      className="group/row relative mb-16 scroll-mt-28 transition-all duration-700"
+      className="group/row category-row relative mb-16 scroll-mt-28 transition-all duration-700"
       style={{
         opacity: visible ? 1 : 0,
         transform: visible ? undefined : 'translate3d(0, 32px, 0)',
+        /* Cascada entre filas tras un cambio de pestana (CSS puro). */
+        transitionDelay: visible ? Math.min(revealIndex * 90, 300) + 'ms' : undefined,
       }}
     >
       {/* Encabezado de la fila */}
@@ -165,7 +218,10 @@ function CategoryRow({
       </div>
 
       {/* Pista de peliculas */}
-      <div className="relative">
+      <div ref={areaRef} className="relative">
+        {/* Halo magico que sigue al puntero (solo escritorio, GPU) */}
+        <span className="row-spotlight" aria-hidden="true" />
+
         {/* Velos laterales de fundido */}
         <div
           className={
@@ -180,14 +236,11 @@ function CategoryRow({
           }
         />
 
-        {/* Estado de carga: pulsos que conservan el alto de la fila. */}
+        {/* Estado de carga: cromos de Hogwarts que conservan el alto de la fila. */}
         {state === 'loading' && items.length === 0 && (
           <div className="flex gap-4 overflow-hidden px-4 sm:px-8 lg:px-12">
             {Array.from({ length: 6 }, (_, index) => (
-              <div
-                key={index}
-                className="h-[360px] w-[240px] shrink-0 animate-pulse rounded-xl border border-gold/20 bg-ink"
-              />
+              <CromoSkeleton key={index} index={index} className="h-[360px] w-[240px]" />
             ))}
           </div>
         )}

@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { Bookmark, Film, Home, Loader2, Menu, Search, Sparkles, Tv, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { HOUSES, hasApiKey } from '../services/tmdb'
+import { onListUpdate } from '../lib/magicFx'
 import type { House, LoadState, ViewTab } from '../types/tmdb'
 
 interface NavbarProps {
@@ -53,6 +54,50 @@ export default function Navbar({
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
+  /**
+   * Bump de "Mi Lista" al guardar/quitar un titulo.
+   *
+   * Se dispara desde el bus tipado `magicFx`, no desde React: cero `setState`
+   * y, por tanto, cero re-renders del navbar. La animacion se pospone un
+   * `requestAnimationFrame` para que el contador nuevo ya este pintado, y se
+   * ejecuta con la Web Animations API (fuera del hilo de pintado de React).
+   */
+  useEffect(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+
+    let frame = 0
+    const unsubscribe = onListUpdate(() => {
+      window.cancelAnimationFrame(frame)
+      frame = window.requestAnimationFrame(() => {
+        // La pestaña puede estar en el menu escritorio y/o en el movil.
+        document.querySelectorAll<HTMLElement>('[data-magic-list]').forEach((tab, order) => {
+          const delay = order * 70
+          tab.animate(
+            [
+              { transform: 'scale(1)' },
+              { transform: 'scale(1.14) translateY(-2px)', offset: 0.35 },
+              { transform: 'scale(1)' },
+            ],
+            { duration: 540, delay, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
+          )
+          tab.querySelector<HTMLElement>('[data-magic-badge]')?.animate(
+            [
+              { transform: 'scale(1) rotate(0deg)' },
+              { transform: 'scale(1.45) rotate(-12deg)', offset: 0.4 },
+              { transform: 'scale(1) rotate(0deg)' },
+            ],
+            { duration: 560, delay, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
+          )
+        })
+      })
+    })
+
+    return () => {
+      window.cancelAnimationFrame(frame)
+      unsubscribe()
+    }
+  }, [])
+
   const term = query.trim()
   const searching = term.length >= 2
   const busy = searching && searchState === 'loading'
@@ -71,6 +116,7 @@ export default function Navbar({
         onClick={() => selectTab(tab.id)}
         aria-current={isActive ? 'page' : undefined}
         title={tab.label}
+        data-magic-list={tab.id === 'list' ? '' : undefined}
         className={
           'relative flex items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-2 font-display text-[0.72rem] font-bold uppercase tracking-[0.14em] transition-all duration-300 ' +
           (isActive
@@ -81,7 +127,10 @@ export default function Navbar({
         <tab.Icon className="h-3.5 w-3.5" aria-hidden="true" />
         {tab.label}
         {tab.id === 'list' && listCount > 0 && (
-          <span className="ml-0.5 rounded-full bg-gold px-1.5 py-px text-[0.6rem] font-black tabular-nums text-night">
+          <span
+            data-magic-badge=""
+            className="ml-0.5 rounded-full bg-gold px-1.5 py-px text-[0.6rem] font-black tabular-nums text-night"
+          >
             {listCount}
           </span>
         )}
