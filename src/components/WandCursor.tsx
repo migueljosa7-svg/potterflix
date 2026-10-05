@@ -318,7 +318,7 @@ function drawWand(
   ctx.roundRect(-length, -2.6, 11, 5.2, 2.6)
   ctx.fill()
 
-  // Empu├▒adura de cuero
+  // Empuñadura de cuero
   ctx.fillStyle = '#1a1310'
   ctx.fillRect(-length + 2, -2.6, 3, 5.2)
 

@@ -314,10 +314,24 @@
     -webkit-font-smoothing: antialiased;
   }
 
-  /* El cursor nativo se oculta: lo reemplaza WandCursor. */
+  /* El cursor nativo se oculta por completo: lo reemplaza WandCursor.
+     Cobertura total (body + interactivos + iframes) para que nunca se vea
+     la flecha del sistema junto a la varita. Solo táctil conserva su gesto. */
   body.has-wand-cursor,
-  body.has-wand-cursor * {
+  body.has-wand-cursor *,
+  body.has-wand-cursor button,
+  body.has-wand-cursor a,
+  body.has-wand-cursor input,
+  body.has-wand-cursor select,
+  body.has-wand-cursor textarea,
+  body.has-wand-cursor [role='button'] {
     cursor: none !important;
+  }
+  @media (pointer: coarse) {
+    body.has-wand-cursor,
+    body.has-wand-cursor * {
+      cursor: auto !important;
+    }
   }
 
   ::selection {

@@ -356,6 +356,7 @@ export default function App() {
                   revealIndex={rowIndex}
                   savedIds={savedIds}
                   onToggleSave={myList.toggle}
+                  autoplay
                 />
               ))}
             </div>

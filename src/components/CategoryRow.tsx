@@ -22,6 +22,13 @@ interface CategoryRowProps {
   revealIndex?: number
   savedIds: Set<string>
   onToggleSave: (item: MediaItem) => void
+  /**
+   * Autoplay opcional/progresivo: desplaza la pista ~1 carta cada
+   * `autoplayIntervalMs`, en pausa con hover/foco/tacto y con movimiento
+   * reducido. Por defecto desactivado (modo exhibición bajo demanda).
+   */
+  autoplay?: boolean
+  autoplayIntervalMs?: number
 }
 
 /**
@@ -32,10 +39,13 @@ const CARD_WIDTH = 240
 const GAP = 16
 
 /**
- * CategoryRow V4.0 — Carrusel horizontal con tarjetas grandes (240×360px).
+ * CategoryRow V4.4 — Carrusel horizontal masivo (240×360px) con Autoplay.
  *
+ * Sin limites duros: pinta todas las `items` que lleguen (TVMaze/TMDB/local).
  * OPTIMIZACION: `syncArrows` se agrupa por fotograma con `requestAnimationFrame`.
  * IntersectionObserver controla la entrada lazy de la seccion completa.
+ * AUTOPLAY: `setInterval` progresivo (~1 carta) con pausa en hover/foco/tacto,
+ * off con `prefers-reduced-motion` y respeto a interacción manual del usuario.
  */
 function CategoryRow({
   title,
@@ -48,6 +58,8 @@ function CategoryRow({
   revealIndex = 0,
   savedIds,
   onToggleSave,
+  autoplay = false,
+  autoplayIntervalMs = 3200,
 }: CategoryRowProps) {
   const trackRef = useRef<HTMLDivElement | null>(null)
   const sectionRef = useRef<HTMLElement | null>(null)
@@ -56,6 +68,9 @@ function CategoryRow({
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(false)
   const [visible, setVisible] = useState(false)
+  /** Pausa del autoplay por interacción (hover/foco/tacto/manual). */
+  const [autoplayPaused, setAutoplayPaused] = useState(false)
+  const resumeTimer = useRef(0)
 
   /** Sincroniza la visibilidad de las flechas, una vez por fotograma. */
   const syncArrows = useCallback(() => {
@@ -153,11 +168,47 @@ function CategoryRow({
   const scrollByCards = (direction: 1 | -1) => {
     const track = trackRef.current
     if (!track) return
+    pauseAutoplay()
     track.scrollBy({
       left: direction * (CARD_WIDTH + GAP) * 2,
       behavior: 'smooth',
     })
   }
+
+  /**
+   * AUTOPLAY PROGRESIVO — avanza ~1 carta por intervalo con rebote en los
+   * extremos (ida y vuelta, sin saltos). Se pausa con hover/foco/tacto,
+   * con interacción manual y con `prefers-reduced-motion`. Sin re-renders:
+   * solo `scrollBy/scrollTo` nativo (composición GPU del scroll).
+   */
+  const pauseAutoplay = useCallback(() => {
+    setAutoplayPaused(true)
+    if (resumeTimer.current) window.clearTimeout(resumeTimer.current)
+    resumeTimer.current = window.setTimeout(() => setAutoplayPaused(false), 6000)
+  }, [])
+
+  useEffect(() => {
+    if (!autoplay || autoplayPaused || !visible || items.length < 2) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    const track = trackRef.current
+    if (!track) return
+    let direction: 1 | -1 = 1
+    const timer = window.setInterval(() => {
+      const maxScroll = track.scrollWidth - track.clientWidth
+      if (maxScroll <= 8) return
+      if (track.scrollLeft >= maxScroll - 8) direction = -1
+      else if (track.scrollLeft <= 8) direction = 1
+      track.scrollBy({ left: direction * (CARD_WIDTH + GAP), behavior: 'smooth' })
+    }, Math.max(autoplayIntervalMs, 1200))
+    return () => window.clearInterval(timer)
+  }, [autoplay, autoplayIntervalMs, autoplayPaused, visible, items.length])
+
+  useEffect(
+    () => () => {
+      if (resumeTimer.current) window.clearTimeout(resumeTimer.current)
+    },
+    [],
+  )
 
   return (
     <section
@@ -264,11 +315,15 @@ function CategoryRow({
           </p>
         )}
 
-        {/* Carrusel horizontal de tarjetas grandes */}
+        {/* Carrusel horizontal masivo de tarjetas grandes (sin límite duro) */}
         <div
           ref={trackRef}
           className="no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-4 sm:px-8 lg:px-12"
           style={{ scrollbarWidth: 'none' }}
+          onPointerEnter={autoplay ? pauseAutoplay : undefined}
+          onPointerDown={autoplay ? pauseAutoplay : undefined}
+          onFocusCapture={autoplay ? pauseAutoplay : undefined}
+          onTouchStart={autoplay ? pauseAutoplay : undefined}
         >
           {items.map((item, index) => (
             <div
