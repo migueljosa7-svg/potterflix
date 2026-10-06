@@ -4,6 +4,7 @@ import CategoryRow from './components/CategoryRow'
 import CromoSkeleton from './components/CromoSkeleton'
 import FloatingCandles from './components/FloatingCandles'
 import MagicHero from './components/MagicHero'
+import MagicParticles from './components/MagicParticles'
 import Navbar from './components/Navbar'
 import WandCursor from './components/WandCursor'
 import WandSparks from './components/WandSparks'
@@ -229,7 +230,8 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-night text-vellum">
-      {/* Velo del Gran Comedor y varita optimizada */}
+      {/* Fondo mistico + velas del Gran Comedor + varita optimizada */}
+      <MagicParticles />
       <FloatingCandles />
       <WandCursor />
       {/* Explosiones de chispas al guardar en Mi Lista (canvas, sin re-renders) */}

@@ -14,42 +14,39 @@ interface Spark {
   hue: 45 | 0 | 280
 }
 
-/** Rapidez con la que la varita persigue al puntero (0-1). */
-const TRAIL_STRENGTH = 0.22
+/** Anillo expansivo del Spell Burst (clic interactivo). */
+interface Ring {
+  x: number
+  y: number
+  r: number
+  maxR: number
+  life: number
+  maxLife: number
+}
+
 /** Distancia minima entre chispas para no saturar la pantalla. */
-const SPAWN_DISTANCE = 8
-/**
- * Maximo de chispas vivas. Bajado de 260 a 140: con sprites pre-renderizados
- * el coste por chispa es ~0,02 ms, asi que el limite ya no marca la diferencia
- * visual pero si alivia al recolector de basura.
- */
-const MAX_SPARKS = 140
-/** Fotogramas sin actividad tras los cuales se apaga el bucle de animacion. */
-const IDLE_FRAMES = 20
+const SPAWN_DISTANCE = 7
+/** Maximo de chispas vivas (sprites => ~0,02 ms por chispa). */
+const MAX_SPARKS = 180
+/** Fotogramas sin actividad tras los cuales se apaga el bucle. */
+const IDLE_FRAMES = 24
+
+/** Acento luminoso por casa: tine la punta y el anillo del Spell Burst. */
+const HOUSE_TIP: Record<string, string> = {
+  gryffindor: '#ff8a7a',
+  slytherin: '#7dfcb0',
+  ravenclaw: '#a9c8ff',
+  hufflepuff: '#ffd75e',
+}
+
+const currentHouse = (): string =>
+  document.documentElement.getAttribute('data-house') ?? 'gryffindor'
 
 /**
- * WandCursor - Sustituye el puntero del raton por una varita magica que
- * proyecta una estela tricolor de chispas oro/plata/purpura (#gold/#amber/#violet).
- *
- * FISICA (60 FPS, Canvas overlay):
- *  - Un unico bucle `requestAnimationFrame`: `pointermove` solo escribe dos
- *    numeros y nunca provoca renderizados de React.
- *  - Estela por distancia (SPAWN_DISTANCE), no por fotograma: gravedad leve
- *    hacia arriba, friccion 0.94 y desvanecimiento progresivo (alpha=progress^2).
- *  - Sprites pre-renderizados oro/plata/purpura + `lighter` aditivo en GPU.
- *  - Spell burst al hacer clic en elementos interactivos (22 chispas radiales).
- *  - Bucle con apagado automatico (IDLE_FRAMES), pausa en tab oculta y respeto
- *    a `prefers-reduced-motion` y puntero grueso.
- *
- * OPTIMIZACIONES CLAVE (antes saturaba el hilo principal):
- *  1. Un unico bucle de `requestAnimationFrame`: el evento `pointermove` solo
- *     escribe dos numeros y nunca provoca renderizados de React.
- *  2. Las chispas se pintan con `drawImage` de un sprite pre-renderizado en
- *     lugar de `createRadialGradient()` por chispa y fotograma.
- *  3. El bucle se detiene por completo cuando no hay movimiento ni chispas
- *     (`IDLE_FRAMES`), dejando el hilo principal libre al 100 %.
- *  4. Se pausa al ocultar la pestaña.
- *  5. `globalCompositeOperation = 'lighter'` deja el destello aditivo a la GPU.
+ * WandCursor ULTRA — varita a 60 FPS sobre overlay Canvas.
+ * Overlay: position fixed, inset 0, pointer-events none, z-index 999999.
+ * La PUNTA vive en las coordenadas EXACTAS del raton (cero latencia).
+ * Estela tricolor oro/plata/purpura + Spell Burst radial en clics.
  */
 export default function WandCursor() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -94,12 +91,12 @@ export default function WandCursor() {
     const spriteFor = (hue: Spark['hue']) =>
       hue === 45 ? sprites.gold : hue === 0 ? sprites.silver : sprites.violet
 
-    // Posicion real del raton y posicion suavizada de la varita.
+    // Punta EXACTA del raton + ultimo spawn. Sin suavizado: cero latencia.
     const pointer = { x: width / 2, y: height / 2 }
-    const wand = { x: width / 2, y: height / 2 }
     const lastSpawn = { x: width / 2, y: height / 2 }
 
     const sparks: Spark[] = []
+    const rings: Ring[] = []
     let hovering = false
     let pressing = false
     let frame = 0
@@ -108,31 +105,38 @@ export default function WandCursor() {
 
     document.body.classList.add('has-wand-cursor')
 
-    /* Eventos: SOLO escriben en variables. Mover el raton no provoca ni un
-       solo renderizado de React. */
+    const wake = () => {
+      idleFrames = 0
+      if (!frame && !paused) frame = window.requestAnimationFrame(draw)
+    }
+
+    /* Eventos: SOLO escriben en variables, cero renders de React. */
     const onMove = (event: PointerEvent) => {
       pointer.x = event.clientX
       pointer.y = event.clientY
       hovering = true
-      idleFrames = 0
-      // Si el bucle esta dormido (pesta├▒a inactiva), lo despertamos.
-      if (!frame && !paused) frame = window.requestAnimationFrame(draw)
+      wake()
     }
     const onLeave = () => {
       hovering = false
     }
     const onDown = (event: PointerEvent) => {
       pressing = true
-      // Spell burst: al pulsar sobre un control interactivo, estallido radial
-      // tricolor en la punta de la varita (rAF, sin setState de React).
+      pointer.x = event.clientX
+      pointer.y = event.clientY
+      // Spell Burst: explosion radial + anillo con el color de la casa.
       const target = event.target as HTMLElement | null
-      if (target && target.closest('button, a, [role="button"], input, select, textarea')) {
-        burst(wand.x, wand.y, 22)
-      } else {
-        burst(wand.x, wand.y, 8)
+      const interactive = Boolean(
+        target?.closest?.(
+          'button, a, input, select, textarea, [role="button"], [role="link"], label, summary',
+        ),
+      )
+      burst(pointer.x, pointer.y, interactive ? 30 : 10)
+      if (interactive) {
+        rings.push({ x: pointer.x, y: pointer.y, r: 6, maxR: 64, life: 22, maxLife: 22 })
+        if (rings.length > 6) rings.shift()
       }
-      idleFrames = 0
-      if (!frame && !paused) frame = window.requestAnimationFrame(draw)
+      wake()
     }
     const onUp = () => {
       pressing = false
@@ -142,6 +146,8 @@ export default function WandCursor() {
       if (paused) {
         window.cancelAnimationFrame(frame)
         frame = 0
+      } else {
+        wake()
       }
     }
 
@@ -178,12 +184,12 @@ export default function WandCursor() {
       })
     }
 
-    /** Estallido radial de hechizo (clic): ráfaga tricolor de alta energía. */
+    /** Estallido radial de hechizo (clic): rafaga tricolor de alta energia. */
     const burst = (x: number, y: number, count: number) => {
-      const total = Math.max(4, Math.min(Math.round(count), 30))
+      const total = Math.max(4, Math.min(Math.round(count), 34))
       for (let i = 0; i < total && sparks.length < MAX_SPARKS; i += 1) {
         const angle = Math.random() * Math.PI * 2
-        const speed = 1.8 + Math.random() * 3.4
+        const speed = 1.8 + Math.random() * 3.6
         const maxLife = 36 + Math.random() * 30
         sparks.push({
           x,
@@ -192,35 +198,28 @@ export default function WandCursor() {
           vy: Math.sin(angle) * speed - 0.6,
           life: maxLife,
           maxLife,
-          size: 1.4 + Math.random() * 2.4,
+          size: 1.4 + Math.random() * 2.6,
           hue: pickHue(),
         })
       }
     }
-const draw = () => {
+    const draw = () => {
       frame = window.requestAnimationFrame(draw)
-
-      // La varita persigue al puntero con inercia suave.
-      wand.x += (pointer.x - wand.x) * TRAIL_STRENGTH
-      wand.y += (pointer.y - wand.y) * TRAIL_STRENGTH
-
       ctx.clearRect(0, 0, width, height)
 
+      // Emision por distancia desde la PUNTA EXACTA (no por fotograma).
       if (hovering) {
-        const dx = wand.x - lastSpawn.x
-        const dy = wand.y - lastSpawn.y
+        const dx = pointer.x - lastSpawn.x
+        const dy = pointer.y - lastSpawn.y
         const distance = Math.hypot(dx, dy)
-
-        // Emite chispas segun la distancia recorrida, no por fotograma.
         if (distance >= SPAWN_DISTANCE) {
-          const steps = Math.min(Math.floor(distance / SPAWN_DISTANCE), 4)
+          const steps = Math.min(Math.floor(distance / SPAWN_DISTANCE), 5)
           for (let i = 1; i <= steps; i += 1) {
             const t = i / steps
-            emit(wand.x - dx * (1 - t), wand.y - dy * (1 - t), pressing ? 1.7 : 1)
+            emit(pointer.x - dx * (1 - t), pointer.y - dy * (1 - t), pressing ? 1.7 : 1)
           }
-          lastSpawn.x = wand.x
-          lastSpawn.y = wand.y
-          idleFrames = 0
+          lastSpawn.x = pointer.x
+          lastSpawn.y = pointer.y
         }
       }
 
@@ -256,18 +255,37 @@ const draw = () => {
         )
       }
 
+      // Anillos del Spell Burst con el color de la casa activa.
+      const tipColor = HOUSE_TIP[currentHouse()] ?? '#ffd700'
+      for (let i = rings.length - 1; i >= 0; i -= 1) {
+        const ring = rings[i]
+        ring.life -= 1
+        const p = ring.life / ring.maxLife
+        if (ring.life <= 0) {
+          rings.splice(i, 1)
+          continue
+        }
+        ring.r += (ring.maxR - ring.r) * 0.22
+        ctx.globalAlpha = p * 0.8
+        ctx.strokeStyle = tipColor
+        ctx.lineWidth = 1.6 + (1 - p) * 1.4
+        ctx.beginPath()
+        ctx.arc(ring.x, ring.y, ring.r, 0, Math.PI * 2)
+        ctx.stroke()
+      }
+
       ctx.globalAlpha = 1
       ctx.globalCompositeOperation = 'source-over'
 
-      if (hovering) {
-        drawWand(ctx, wand.x, wand.y, pressing)
-      }
+      // La punta vive en las coordenadas EXACTAS del raton.
+      if (hovering) drawWand(ctx, pointer.x, pointer.y, pressing, tipColor)
 
-      /* Apagado automatico: sin puntero en movimiento y sin chispas vivas,
-         el bucle se detiene para liberar por completo el hilo principal. */
       const active =
         hovering &&
-        (sparks.length > 0 || pointer.x !== wand.x || pointer.y !== wand.y)
+        (sparks.length > 0 ||
+          rings.length > 0 ||
+          pointer.x !== lastSpawn.x ||
+          pointer.y !== lastSpawn.y)
       idleFrames = active ? 0 : idleFrames + 1
       if (idleFrames > IDLE_FRAMES) {
         window.cancelAnimationFrame(frame)
@@ -293,19 +311,21 @@ const draw = () => {
     <canvas
       ref={canvasRef}
       aria-hidden="true"
-      className="gpu pointer-events-none fixed inset-0 z-[9999]"
+      className="gpu pointer-events-none fixed inset-0"
+      style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 999999 }}
     />
   )
 }
 
-/** Dibuja la varita: mango, cuerpo de madera y destello en la punta. */
+/** Varita con la punta EXACTA en (x, y) + halo del color de la casa. */
 function drawWand(
   ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
   pressing: boolean,
+  tipColor: string,
 ) {
-  const length = pressing ? 40 : 32
+  const length = pressing ? 42 : 34
   const angle = -Math.PI / 3.6
 
   ctx.save()
@@ -332,11 +352,11 @@ function drawWand(
   ctx.roundRect(-length + 10, -1.5, length - 10, 3, 1.5)
   ctx.fill()
 
-  // Destello de la punta
-  const tipRadius = pressing ? 11 : 7
+  // Destello de la punta: nucleo blanco + halo del color de la casa.
+  const tipRadius = pressing ? 12 : 7.5
   const tip = ctx.createRadialGradient(0, 0, 0, 0, 0, tipRadius)
   tip.addColorStop(0, 'rgba(255, 248, 214, 0.95)')
-  tip.addColorStop(0.4, 'rgba(255, 215, 0, 0.55)')
+  tip.addColorStop(0.35, tipColor + 'cc')
   tip.addColorStop(1, 'rgba(255, 215, 0, 0)')
   ctx.fillStyle = tip
   ctx.beginPath()

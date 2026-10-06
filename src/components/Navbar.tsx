@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { Bookmark, Film, Home, Loader2, Menu, Search, Sparkles, Tv, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { HOUSES, hasApiKey } from '../services/tmdb'
+import HouseFilter from './HouseFilter'
 import { onListUpdate } from '../lib/magicFx'
 import type { House, LoadState, ViewTab } from '../types/tmdb'
 
@@ -242,10 +243,44 @@ export default function Navbar({
           </span>
         )}
 
-        {/* Conmutador de Casas (solo escritorio) */}
-        <div className="hidden shrink-0 items-center gap-1.5 lg:flex">
-          {HOUSES.map(renderHouse)}
+        {/* Selector de Casas ULTRA (solo escritorio) */}
+        <div className="hidden shrink-0 items-center lg:flex">
+          <HouseFilter activeHouse={activeHouse} onHouseChange={onHouseChange} />
         </div>
+
+        {/* Selector de Casas para el panel movil (inline, no renderiza el wrapper) */}
+        {menuOpen && (
+          <div className="flex items-center justify-center gap-1.5 py-1">
+            {HOUSES.map((house) => {
+              const isActive = activeHouse === house.id
+              return (
+                <button
+                  key={house.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={isActive}
+                  aria-label={'Casa ' + house.name}
+                  onClick={() => onHouseChange(house.id)}
+                  style={{
+                    borderColor: isActive ? house.secondary : house.color + '99',
+                    background: isActive ? house.color : 'rgba(8,9,15,0.8)',
+                    transform: isActive ? 'scale(1.12)' : 'scale(1)',
+                    transformOrigin: 'center',
+                  }}
+                  className={
+                    'flex h-10 w-10 items-center justify-center rounded-full border-2 text-base transition-all duration-300 ' +
+                    (isActive ? 'ultra-house-glow' : 'opacity-65 hover:opacity-100 hover:scale-105')
+                  }
+                >
+                  <span aria-hidden="true" className="leading-none">
+                    {house.sigil}
+                  </span>
+                  <span className="sr-only">{house.name}</span>
+                </button>
+              )
+            })}
+          </div>
+        )}
 
         {/* Boton de menu movil */}
         <button
